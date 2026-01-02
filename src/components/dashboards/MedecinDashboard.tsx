@@ -11,6 +11,8 @@ import { ConsultationsView } from '../doctor/ConsultationsView';
 import { PatientsView } from '../doctor/PatientsView';
 import { RevenueView } from '../doctor/RevenueView';
 import { ProfileView } from '../doctor/ProfileView';
+import { LanguageSelector } from '../common/LanguageSelector';
+import { useLanguage } from '../../contexts/LanguageContext';
 
 interface MedecinDashboardProps {
   user: any;
@@ -24,13 +26,14 @@ export function MedecinDashboard({ user, profile, onLogout }: MedecinDashboardPr
   const [showAdminChat, setShowAdminChat] = useState(false);
   const [showProfileModal, setShowProfileModal] = useState(false);
   const unreadMessages = useUnreadMessages(profile.id);
+  const { t } = useLanguage();
 
   const navItems = [
-    { id: 'agenda', label: 'Agenda', icon: Calendar },
-    { id: 'consultations', label: 'Consultations', icon: FileText },
-    { id: 'patients', label: 'Patients', icon: Users },
-    { id: 'revenus', label: 'Revenus', icon: DollarSign },
-    { id: 'profil', label: 'Profil', icon: User },
+    { id: 'agenda', label: t('calendar'), icon: Calendar },
+    { id: 'consultations', label: t('consultations'), icon: FileText },
+    { id: 'patients', label: t('patients'), icon: Users },
+    { id: 'revenus', label: t('revenue'), icon: DollarSign },
+    { id: 'profil', label: t('profile'), icon: User },
   ];
 
   return (
@@ -75,10 +78,13 @@ export function MedecinDashboard({ user, profile, onLogout }: MedecinDashboardPr
 
             {/* User Actions */}
             <div className="flex items-center gap-2">
+              {/* Language Selector */}
+              <LanguageSelector />
+              
               <button
                 onClick={() => setShowSecretaryChat(!showSecretaryChat)}
                 className="relative p-2 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
-                title="Chat avec secrétaires"
+                title={t('chat_with_secretary')}
                 style={{ zIndex: 100 }}
               >
                 <MessageCircle className="w-5 h-5" />
@@ -92,7 +98,7 @@ export function MedecinDashboard({ user, profile, onLogout }: MedecinDashboardPr
               <button
                 onClick={() => setShowAdminChat(!showAdminChat)}
                 className="relative p-2 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
-                title="Chat avec admin"
+                title={t('chat_with_admin')}
                 style={{ zIndex: 100 }}
               >
                 <Shield className="w-5 h-5" />
@@ -106,7 +112,7 @@ export function MedecinDashboard({ user, profile, onLogout }: MedecinDashboardPr
               <button
                 onClick={() => setShowProfileModal(true)}
                 className="p-2 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
-                title="Profil"
+                title={t('profile')}
               >
                 <User className="w-5 h-5" />
               </button>

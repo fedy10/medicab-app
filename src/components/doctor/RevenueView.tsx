@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
 import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import { TrendingUp, TrendingDown, Calendar, DollarSign, Filter } from 'lucide-react';
+import { useLanguage } from '../../contexts/LanguageContext';
 
 interface RevenueViewProps {
   doctorId: string;
@@ -19,6 +20,7 @@ interface Consultation {
 }
 
 export function RevenueView({ doctorId }: RevenueViewProps) {
+  const { t } = useLanguage();
   const [period, setPeriod] = useState<'day' | 'month' | 'year'>('month');
   const [consultations, setConsultations] = useState<Consultation[]>([]);
   const [selectedDate, setSelectedDate] = useState(new Date());
@@ -224,28 +226,28 @@ export function RevenueView({ doctorId }: RevenueViewProps) {
 
   const stats = [
     {
-      label: period === 'day' ? 'Revenus du jour' : period === 'month' ? 'Revenus du mois' : 'Revenus de l\'année',
+      label: period === 'day' ? t('daily') + ' ' + t('revenue').toLowerCase() : period === 'month' ? t('monthly_revenue') : t('yearly') + ' ' + t('revenue').toLowerCase(),
       value: `${totalRevenue.toLocaleString()} TND`,
       change: `${revenueChange >= 0 ? '+' : ''}${revenueChange}%`,
       trend: revenueChange >= 0 ? 'up' : 'down',
       color: 'from-green-500 to-emerald-500',
     },
     {
-      label: period === 'day' ? 'Total du jour' : period === 'month' ? 'Moyenne par jour' : 'Moyenne par mois',
+      label: period === 'day' ? t('today') + ' ' + t('total').toLowerCase() : period === 'month' ? t('average_per_consultation') : t('monthly') + ' ' + t('average').toLowerCase(),
       value: `${calculateAverage().toLocaleString()} TND`,
       change: '',
       trend: 'up',
       color: 'from-blue-500 to-cyan-500',
     },
     {
-      label: period === 'day' ? 'Patients du jour' : period === 'month' ? 'Patients du mois' : 'Patients de l\'année',
+      label: period === 'day' ? t('patients') + ' ' + t('today').toLowerCase() : period === 'month' ? t('patients') + ' ' + t('this_month').toLowerCase() : t('patients') + ' ' + t('this_year').toLowerCase(),
       value: `${totalPatients}`,
       change: '',
       trend: 'up',
       color: 'from-purple-500 to-pink-500',
     },
     {
-      label: 'Tarif moyen',
+      label: t('average') + ' ' + t('tariff').toLowerCase(),
       value: totalPatients > 0 ? `${Math.round(totalRevenue / totalPatients)} TND` : '0 TND',
       change: '',
       trend: 'up',
@@ -423,7 +425,7 @@ export function RevenueView({ doctorId }: RevenueViewProps) {
           transition={{ delay: 0.5 }}
           className="bg-white rounded-2xl p-6 shadow-lg border border-gray-100"
         >
-          <h4 className="text-gray-900 mb-4">Répartition par mode de paiement</h4>
+          <h4 className="text-gray-900 mb-4">{t('payment_breakdown')}</h4>
           {paymentMethodsData.length > 0 ? (
             <ResponsiveContainer width="100%" height={300}>
               <PieChart>

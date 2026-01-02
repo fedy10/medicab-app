@@ -11,6 +11,8 @@ import { DoctorSecretaryChat } from '../chat/DoctorSecretaryChat';
 import { AnimatedBackground } from '../ui/AnimatedBackground';
 import { useUnreadMessages } from '../../hooks/useUnreadMessages';
 import { ProfileModal } from '../modals/ProfileModal';
+import { LanguageSelector } from '../common/LanguageSelector';
+import { useLanguage } from '../../contexts/LanguageContext';
 
 interface SecretaireDashboardProps {
   user: any;
@@ -23,12 +25,13 @@ export function SecretaireDashboard({ user, profile, onLogout }: SecretaireDashb
   const [showDoctorChat, setShowDoctorChat] = useState(false);
   const [showProfileModal, setShowProfileModal] = useState(false);
   const unreadMessages = useUnreadMessages(profile.id);
+  const { t } = useLanguage();
 
   const navItems = [
-    { id: 'consultations', label: 'Consultations', icon: FileText },
-    { id: 'patients', label: 'Patients', icon: Users },
-    { id: 'agenda', label: 'Agenda', icon: Calendar },
-    { id: 'profil', label: 'Profil', icon: User },
+    { id: 'consultations', label: t('consultations'), icon: FileText },
+    { id: 'patients', label: t('patients'), icon: Users },
+    { id: 'agenda', label: t('calendar'), icon: Calendar },
+    { id: 'profil', label: t('profile'), icon: User },
   ];
 
   return (
@@ -73,6 +76,9 @@ export function SecretaireDashboard({ user, profile, onLogout }: SecretaireDashb
 
             {/* User Actions */}
             <div className="flex items-center gap-2">
+              {/* Language Selector */}
+              <LanguageSelector />
+              
               <button
                 onClick={() => setShowDoctorChat(!showDoctorChat)}
                 className="relative p-2 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"

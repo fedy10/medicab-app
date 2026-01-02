@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { User, Mail, Phone, MapPin, Briefcase, Hash, Edit, UserPlus, CheckCircle, XCircle, Key } from 'lucide-react';
 import type { User as UserType } from '../../App';
+import { useLanguage } from '../../contexts/LanguageContext';
 
 interface Secretary {
   id: string;
@@ -21,6 +22,7 @@ interface ProfileViewProps {
 }
 
 export function ProfileView({ user }: ProfileViewProps) {
+  const { t } = useLanguage();
   const [isEditing, setIsEditing] = useState(false);
   const [showAddSecretary, setShowAddSecretary] = useState(false);
 
@@ -84,7 +86,7 @@ export function ProfileView({ user }: ProfileViewProps) {
       {/* Profile info */}
       <div className="bg-white rounded-2xl p-6 shadow-lg border border-gray-100">
         <div className="flex items-center justify-between mb-6">
-          <h3 className="text-gray-900">Informations personnelles</h3>
+          <h3 className="text-gray-900">{t('personal_information')}</h3>
           <motion.button
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
@@ -98,12 +100,12 @@ export function ProfileView({ user }: ProfileViewProps) {
             {isEditing ? (
               <>
                 <CheckCircle className="w-4 h-4" />
-                Enregistrer
+                {t('save')}
               </>
             ) : (
               <>
                 <Edit className="w-4 h-4" />
-                Modifier
+                {t('edit')}
               </>
             )}
           </motion.button>

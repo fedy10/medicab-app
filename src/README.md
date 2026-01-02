@@ -1,150 +1,206 @@
-# MediCab Pro - Gestion Intelligente de Cabinet Médical
+# 🏥 MEDICAB - Application de Gestion de Cabinet Médical
 
-Application moderne et immersive pour la gestion complète de cabinets médicaux, avec support multi-utilisateurs et interfaces 3D interactives.
+Application moderne de gestion de cabinet médical multi-utilisateur avec interfaces 3D interactives et base de données cloud Supabase.
 
-## 🎯 Architecture Multi-Utilisateurs
+## 🚀 Démarrage Rapide
 
-L'application supporte 3 types d'utilisateurs avec des permissions spécifiques :
+### ⚡ Configuration en 5 minutes
 
-### 1. 👨‍💼 Administrateur
-- Gestion complète des médecins (création, suspension, validation)
-- Tableau de bord financier avec statistiques 3D
-- Suivi des paiements et facturation automatique
-- Alertes intelligentes pour retards de paiement
-- Analyse des revenus par période
+**L'application nécessite une configuration Supabase avant de démarrer.**
 
-### 2. 👨‍⚕️ Médecin
-- **Agenda interactif** : Calendrier 3D avec gestion complète des rendez-vous
-- **Consultations** : Dossiers patients complets avec historique médical
-- **Assistant IA** : Suggestions d'examens, aide au diagnostic, génération d'ordonnances
-- **Patients** : Base de données complète avec recherche vocale
-- **Revenus** : Statistiques détaillées et prévisions IA
-- **Profil** : Gestion des secrétaires et paramètres du cabinet
+👉 **Suivez le guide** : [CONFIGURATION_RAPIDE.md](./CONFIGURATION_RAPIDE.md)
 
-### 3. 👩‍💼 Secrétaire
-- Gestion de l'agenda du médecin
-- Confirmation des rendez-vous
-- Gestion des patients
-- Visualisation des consultations (sans modification)
+### 📋 Étapes résumées :
 
-## 🔐 Comptes de Démonstration
+1. **Créer un projet Supabase** sur [supabase.com](https://supabase.com)
+2. **Configurer le fichier `.env`** avec vos identifiants
+3. **Exécuter le schema SQL** dans Supabase SQL Editor
+4. **Redémarrer l'application** : `npm run dev`
 
-### Administrateur
-- **Email**: admin@medicab.tn
-- **Mot de passe**: admin123
+## ✨ Fonctionnalités
 
-### Médecin
-- **Email**: dr.ben.ali@medicab.tn
-- **Mot de passe**: doctor123
-- **Code médecin**: DOC-001
+### 👨‍⚕️ Pour les Médecins
+- 📅 Gestion des rendez-vous avec agenda visuel
+- 👥 Gestion complète des patients avec dossiers médicaux
+- 📝 Consultations avec assistant IA
+- 🎤 Reconnaissance vocale pour les notes médicales
+- 💰 Suivi des revenus avec graphiques 3D
+- 📧 Système de référencement entre médecins
+- 💬 Chat privé avec l'administrateur et les secrétaires
 
-### Secrétaire
-- **Email**: fatma.sec@medicab.tn
-- **Mot de passe**: secretary123
-- **Rattachée au**: DOC-001
+### 👨‍💼 Pour l'Administrateur
+- 👨‍⚕️ Gestion des médecins (validation, suspension)
+- 📊 Tableau de bord statistiques global
+- 💵 Vue d'ensemble des revenus de tous les médecins
+- 👥 Gestion des utilisateurs
+- 💬 Chat avec tous les médecins
 
-## ✨ Fonctionnalités Principales
+### 👩‍💼 Pour les Secrétaires
+- 📅 Gestion de l'agenda du médecin assigné
+- 👥 Gestion des patients
+- 📞 Prise de rendez-vous
+- 💬 Chat avec le médecin
 
-### 📅 Agenda / Calendrier
-- Calendrier mensuel interactif avec animations 3D
-- Timeline quotidienne avec créneaux horaires
-- Ajout/modification/suppression de rendez-vous
-- Confirmation en temps réel des présences
-- Recherche intelligente de patients
-- Distinction consultations / contrôles
-- Gestion des modes de paiement (Normal, CNAM, Assurance, Gratuit)
+### 🌍 Système Multilingue
+- 🇫🇷 Français
+- 🇬🇧 Anglais
+- 🇸🇦 Arabe
+- Plus de 700 traductions
 
-### 🏥 Consultations
-- Dossier médical complet automatique
-- Historique chronologique 3D
-- Maladies chroniques et antécédents
-- Imageries (IRM, Scanner, Radio)
-- Analyses biologiques
-- Lettres médecin → médecin pré-remplies
-- **Assistant IA médical intégré** :
-  - Propositions d'examens pour nouveaux patients
-  - Aide au diagnostic
-  - Génération intelligente d'ordonnances
-  - Résumé automatique de dossier
+## 🛠️ Technologies
 
-### 👥 Patients
-- Liste complète avec filtres avancés
-- **Recherche vocale** activée
-- Recherche par nom, téléphone, adresse
-- Cartes patients avec statistiques
-- Historique complet des visites
+- **Frontend** : React + TypeScript + Vite
+- **UI** : Tailwind CSS + Motion (Framer Motion)
+- **Base de données** : Supabase (PostgreSQL)
+- **Authentification** : Supabase Auth
+- **3D/Animations** : Motion/React
+- **Charts** : Recharts
+- **État** : React Context + Hooks
 
-### 💰 Revenus (Médecin uniquement)
-- Graphiques 3D animés
-- Statistiques par jour/semaine/mois/année
-- Répartition par mode de paiement
-- Prévisions IA du chiffre d'affaires
-- Comparaisons mensuelles
-- Objectifs et tendances
+## 📦 Installation
 
-### 👤 Profil
-**Pour médecins** :
-- Modification des informations professionnelles
-- Gestion des secrétaires (validation, suspension)
-- Réinitialisation des mots de passe
-- Partage du code médecin
+```bash
+# 1. Installer les dépendances
+npm install
 
-**Pour secrétaires** :
-- Modification des informations personnelles
-- Visualisation du code médecin du cabinet
+# 2. Configurer Supabase (voir CONFIGURATION_RAPIDE.md)
+# - Créer un projet sur supabase.com
+# - Modifier le fichier .env
+# - Exécuter supabase/schema.sql
 
-## 🎨 Design & UX
+# 3. Démarrer l'application
+npm run dev
+```
 
-- **Interface moderne et immersive** avec animations fluides
-- **Éléments 3D interactifs** utilisant Motion (Framer Motion)
-- **Design responsive** adapté mobile et web
-- **Animations de transition** entre les pages
-- **Effets de hover et de clic** pour meilleure interactivité
-- **Gradients colorés** et effets glassmorphism
-- **Badges visuels** pour les statuts et états
+## 📚 Documentation
 
-## 🛠️ Technologies Utilisées
+| Fichier | Description |
+|---------|-------------|
+| **[CONFIGURATION_RAPIDE.md](./CONFIGURATION_RAPIDE.md)** | ⚡ Guide de démarrage 5 minutes |
+| **[PROCHAINES_ETAPES.md](./PROCHAINES_ETAPES.md)** | 📋 Instructions détaillées |
+| **[README_SUPABASE.md](./README_SUPABASE.md)** | 📖 Vue d'ensemble Supabase |
+| **[SUPABASE_SETUP.md](./SUPABASE_SETUP.md)** | 🔧 Configuration avancée |
+| **[MIGRATION_GUIDE.md](./MIGRATION_GUIDE.md)** | 🔄 Guide de migration |
+| **[SUPABASE_FAQ.md](./SUPABASE_FAQ.md)** | ❓ Questions fréquentes |
+| **[ERREURS_CORRIGEES.md](./ERREURS_CORRIGEES.md)** | 🐛 Résolution de problèmes |
 
-- **React** avec TypeScript
-- **Motion (Framer Motion)** pour animations 3D
-- **Tailwind CSS** pour le styling
-- **Recharts** pour graphiques interactifs
-- **Lucide React** pour les icônes
-- **Web Speech API** pour recherche vocale
+## 🎯 Architecture
 
-## ⚠️ Important - Données Médicales
+```
+/
+├── components/          # Composants React
+│   ├── auth/           # Authentification (Login/Register)
+│   ├── dashboards/     # Dashboards (Admin/Médecin/Secrétaire)
+│   ├── doctor/         # Composants médecin
+│   ├── secretary/      # Composants secrétaire
+│   ├── admin/          # Composants admin
+│   └── ui/             # Composants UI réutilisables
+├── lib/                # Services et configuration
+│   ├── supabase.ts     # Client Supabase
+│   ├── database.types.ts # Types TypeScript
+│   └── services/       # Services Supabase
+├── hooks/              # React Hooks personnalisés
+├── contexts/           # React Contexts
+├── utils/              # Utilitaires
+├── supabase/           # Configuration Supabase
+│   └── schema.sql      # Schéma de base de données
+└── styles/             # Styles globaux
+```
 
-**Cette application est un PROTOTYPE de démonstration.**
+## 🗄️ Base de données (Supabase)
 
-Pour une utilisation en production avec de vraies données médicales :
-- ✅ Conformité RGPD obligatoire
-- ✅ Hébergement certifié données de santé
-- ✅ Chiffrement end-to-end
-- ✅ Audits de sécurité réguliers
-- ✅ Certifications médicales requises
-- ✅ Backup et disaster recovery
+### Tables principales :
 
-**Ne pas utiliser avec de vraies données patients sans certification appropriée.**
+- **profiles** - Utilisateurs (admin, médecins, secrétaires)
+- **patients** - Dossiers patients
+- **appointments** - Rendez-vous
+- **consultations** - Consultations médicales
+- **revenues** - Revenus et paiements
+- **chat_messages** - Messages privés
+- **referral_letters** - Lettres de référencement
+- **notifications** - Notifications
+- **medical_files** - Fichiers médicaux
 
-## 🚀 Prochaines Fonctionnalités
+Voir `supabase/schema.sql` pour le schéma complet.
 
-- Intégration avec systèmes de paiement en ligne
-- Notifications push et SMS pour rappels
-- Export PDF des ordonnances et documents
-- Synchronisation multi-appareils
-- Chat sécurisé médecin-patient
-- Téléconsultation intégrée
-- Signature électronique des documents
-- API pour intégration avec autres systèmes médicaux
+## 🔐 Sécurité
 
-## 📱 Utilisation
+- ✅ Row Level Security (RLS) activé sur toutes les tables
+- ✅ Authentification Supabase Auth
+- ✅ Validation des rôles (admin, doctor, secretary)
+- ✅ Tokens JWT sécurisés
+- ✅ Variables d'environnement (.env non commité)
 
-1. Connectez-vous avec un des comptes de démonstration
-2. Explorez les différentes fonctionnalités selon votre rôle
-3. Testez l'assistant IA médical dans les consultations
-4. Utilisez la recherche vocale dans la section Patients
-5. Visualisez les statistiques dans Revenus (médecin) ou Dashboard (admin)
+## 🚀 Déploiement
+
+### Variables d'environnement requises :
+
+```bash
+VITE_SUPABASE_URL=https://votre-projet.supabase.co
+VITE_SUPABASE_ANON_KEY=votre-cle-anon
+```
+
+### Hébergement recommandé :
+
+- **Frontend** : Vercel, Netlify, ou Cloudflare Pages
+- **Base de données** : Supabase (déjà configuré)
+
+```bash
+# Build pour production
+npm run build
+
+# Preview du build
+npm run preview
+```
+
+## 🧪 Comptes de test
+
+Après avoir exécuté le schema SQL et créé les utilisateurs, vous pouvez tester avec :
+
+- **Admin** : `admin@medicab.tn` / `admin123`
+- **Médecin** : `dr.ben.ali@medicab.tn` / `doctor123`
+- **Secrétaire** : `fatma.sec@medicab.tn` / `secretary123`
+
+> **Note** : Vous devez créer ces utilisateurs dans Supabase. Voir [CONFIGURATION_RAPIDE.md](./CONFIGURATION_RAPIDE.md)
+
+## 🤝 Contribution
+
+Ce projet est une application complète de gestion de cabinet médical. Pour contribuer :
+
+1. Fork le projet
+2. Créer une branche (`git checkout -b feature/AmazingFeature`)
+3. Commit les changements (`git commit -m 'Add AmazingFeature'`)
+4. Push vers la branche (`git push origin feature/AmazingFeature`)
+5. Ouvrir une Pull Request
+
+## 📝 License
+
+Ce projet est sous licence MIT.
+
+## 🆘 Support
+
+### Problèmes courants :
+
+#### ❌ "Variables Supabase manquantes"
+➡️ Voir [CONFIGURATION_RAPIDE.md](./CONFIGURATION_RAPIDE.md)
+
+#### ❌ "Invalid API key"
+➡️ Vérifiez votre fichier `.env` et redémarrez le serveur
+
+#### ❌ "Permission denied"
+➡️ Vérifiez que le schema SQL a été exécuté correctement
+
+### Documentation :
+
+Consultez les fichiers de documentation dans le dossier racine pour plus d'informations.
+
+## ✨ Auteurs
+
+Développé avec ❤️ pour les professionnels de santé
 
 ---
 
-**MediCab Pro** - Transformez la gestion de votre cabinet médical 🏥✨
+**Version** : 2.0.0 (Supabase Edition)  
+**Dernière mise à jour** : Décembre 2025
+
+**🎉 Prêt à démarrer ? → [CONFIGURATION_RAPIDE.md](./CONFIGURATION_RAPIDE.md)**

@@ -4,6 +4,12 @@ import { Search, Mic, User, Phone, MapPin, FileText } from 'lucide-react';
 import { PatientFileView } from '../doctor/PatientFileView';
 import { PaginationComponent } from '../ui/PaginationComponent';
 
+interface Disease {
+  name: string;
+  isChronic: boolean;
+  category?: string;
+}
+
 interface Patient {
   id: string;
   name: string;
@@ -14,7 +20,7 @@ interface Patient {
   job: string;
   lastVisit: string;
   consultationsCount: number;
-  diseases: string[];
+  diseases: Disease[];
   consultations: {
     date: string;
     prescription: string;
@@ -48,7 +54,10 @@ export function SecretaryPatientsView({ secretaryId, doctorId }: SecretaryPatien
       job: 'Enseignant',
       lastVisit: '2024-12-11',
       consultationsCount: 8,
-      diseases: ['Hypertension', 'Diabète type 2'],
+      diseases: [
+        { name: 'Hypertension', isChronic: true },
+        { name: 'Diabète type 2', isChronic: true },
+      ],
       consultations: [
         {
           date: '2024-11-15',
@@ -70,7 +79,9 @@ export function SecretaryPatientsView({ secretaryId, doctorId }: SecretaryPatien
       job: 'Pharmacienne',
       lastVisit: '2024-12-10',
       consultationsCount: 5,
-      diseases: ['Migraine chronique'],
+      diseases: [
+        { name: 'Migraine chronique', isChronic: true },
+      ],
       consultations: [
         {
           date: '2024-10-05',
@@ -106,7 +117,9 @@ export function SecretaryPatientsView({ secretaryId, doctorId }: SecretaryPatien
       job: 'Commerçante',
       lastVisit: '2024-12-09',
       consultationsCount: 12,
-      diseases: ['Arthrose'],
+      diseases: [
+        { name: 'Arthrose', isChronic: true },
+      ],
       consultations: [],
       files: [],
     },

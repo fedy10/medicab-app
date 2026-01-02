@@ -1,8 +1,10 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { X, FileText, Upload, Eye, Download, Trash2, Clock, Printer, Pill, FlaskConical, Image as ImageIcon } from 'lucide-react';
-import { FileUploader } from './FileUploader';
+import { X, FileText, Upload, Eye, Download, Trash2, Clock, Printer, Pill, FlaskConical, Image as ImageIcon, Edit2 } from 'lucide-react';
+import { ModernFileUploader } from './ModernFileUploader';
 import { PrintableDocument } from './PrintableDocument';
+import { ChronicDiseasesSelector } from '../ui/ChronicDiseasesSelector';
+import { useLanguage } from '../../contexts/LanguageContext';
 
 interface PatientFile {
   id: string;
@@ -26,6 +28,12 @@ interface ConsultationHistory {
   }[];
 }
 
+interface Disease {
+  name: string;
+  isChronic: boolean;
+  category?: string;
+}
+
 interface Patient {
   id: string;
   name: string;
@@ -34,7 +42,7 @@ interface Patient {
   phone: string;
   address: string;
   job: string;
-  diseases: string[];
+  diseases: Disease[];
   consultations: ConsultationHistory[];
   files: PatientFile[];
 }
@@ -53,12 +61,13 @@ const doctorInfo = {
 };
 
 export function PatientFileView({ patient, onClose, canUploadFiles = true }: PatientFileViewProps) {
+  const { t } = useLanguage();
   const [files, setFiles] = useState<PatientFile[]>(patient.files || [
     {
       id: '1',
       name: 'Résultats_IRM_20241015.pdf',
       type: 'IRM',
-      uploadDate: '2024-10-15',
+      uploadDate: '15/10/2024',
       uploadedBy: 'Secrétaire',
       size: '2.4 MB',
     },
@@ -66,7 +75,7 @@ export function PatientFileView({ patient, onClose, canUploadFiles = true }: Pat
       id: '2',
       name: 'Analyses_sang_20241110.pdf',
       type: 'Analyse',
-      uploadDate: '2024-11-10',
+      uploadDate: '10/11/2024',
       uploadedBy: 'Dr. Ben Ali',
       size: '1.1 MB',
     },
@@ -80,6 +89,8 @@ export function PatientFileView({ patient, onClose, canUploadFiles = true }: Pat
     consultationIndex: number;
     originalContent: string;
   } | null>(null);
+  const [editingFileName, setEditingFileName] = useState<string | null>(null);
+  const [newFileName, setNewFileName] = useState('');
 
   const formatFileSize = (bytes: number): string => {
     if (bytes === 0) return '0 Bytes';
@@ -89,23 +100,37 @@ export function PatientFileView({ patient, onClose, canUploadFiles = true }: Pat
     return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i];
   };
 
-  const handleUploadFile = (file: File, type: string) => {
+  const handleUploadFile = (fileName: string, fileType: string, file: File) => {
+    const fileExtension = file.name.split('.').pop() || 'pdf';
+    const fullFileName = `${fileName}.${fileExtension}`;
+
     const newFile: PatientFile = {
-      id: Date.now().toString(),
-      name: file.name,
-      type: type,
-      uploadDate: new Date().toISOString().split('T')[0],
-      uploadedBy: 'Utilisateur actuel',
+      id: `file-${Date.now()}`,
+      name: fullFileName,
+      type: fileType,
+      uploadDate: new Date().toLocaleDateString('fr-FR'),
+      uploadedBy: doctorInfo.name,
       size: formatFileSize(file.size),
     };
     setFiles([...files, newFile]);
-    alert('Fichier ajouté avec succès !');
+    alert('✅ Fichier ajouté avec succès !');
+  };
+
+  const handleRenameFile = (fileId: string) => {
+    if (newFileName.trim()) {
+      setFiles(files.map(f => 
+        f.id === fileId ? { ...f, name: newFileName.trim() } : f
+      ));
+      setEditingFileName(null);
+      setNewFileName('');
+      alert('✅ Fichier renommé avec succès !');
+    }
   };
 
   const handleDeleteFile = (fileId: string) => {
     if (confirm('Êtes-vous sûr de vouloir supprimer ce fichier ?')) {
       setFiles(files.filter((f) => f.id !== fileId));
-      alert('Fichier supprimé avec succès !');
+      alert('✅ Fichier supprimé avec succès !');
     }
   };
 
@@ -155,7 +180,7 @@ export function PatientFileView({ patient, onClose, canUploadFiles = true }: Pat
       setConsultations(updatedConsultations);
       
       // Afficher une notification
-      alert(`Document modifié et historique enregistré !\n\nModification par: ${currentUser}\nDate: ${currentDate}`);
+      alert(`✅ Document modifié et historique enregistré !\n\n📝 Modification par: ${currentUser}\n📅 Date: ${currentDate}`);
     }
     
     setPrintDocument(null);
@@ -215,24 +240,19 @@ export function PatientFileView({ patient, onClose, canUploadFiles = true }: Pat
         {/* Diseases */}
         {patient.diseases.length > 0 && (
           <div className="mb-6">
-            <h3 className="text-gray-900 mb-3">Maladies chroniques</h3>
-            <div className="flex flex-wrap gap-2">
-              {patient.diseases.map((disease, i) => (
-                <span
-                  key={i}
-                  className="px-3 py-1 bg-red-100 text-red-700 rounded-full text-sm"
-                >
-                  {disease}
-                </span>
-              ))}
-            </div>
+            <ChronicDiseasesSelector
+              selectedDiseases={patient.diseases}
+              onChange={() => {}} // Mode lecture seul
+              label="Maladies"
+              isEditing={false}
+            />
           </div>
         )}
 
         {/* Consultation history */}
         <div className="mb-6">
           <h3 className="text-gray-900 mb-4">Historique des consultations</h3>
-          <div className="space-y-4">
+          <div className="space-y-4 max-h-[400px] overflow-y-auto custom-scrollbar pr-2">
             {patient.consultations.length > 0 ? (
               patient.consultations.map((consult, i) => (
                 <motion.div
@@ -334,7 +354,7 @@ export function PatientFileView({ patient, onClose, canUploadFiles = true }: Pat
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
                 onClick={() => setShowUploadDialog(true)}
-                className="flex items-center gap-2 px-4 py-2 bg-blue-500 text-white rounded-xl hover:bg-blue-600"
+                className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-500 to-purple-600 text-white rounded-xl hover:shadow-lg"
               >
                 <Upload className="w-4 h-4" />
                 Ajouter un fichier
@@ -342,68 +362,125 @@ export function PatientFileView({ patient, onClose, canUploadFiles = true }: Pat
             )}
           </div>
           
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {files.length > 0 ? (
-              files.map((file, i) => (
-                <motion.div
-                  key={file.id}
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: i * 0.05 }}
-                  className="bg-gray-50 rounded-xl p-4 hover:bg-gray-100 transition-colors"
-                >
-                  <div className="flex items-start justify-between">
-                    <div className="flex items-start gap-3 flex-1">
-                      <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center flex-shrink-0">
-                        <FileText className="w-5 h-5 text-blue-600" />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-gray-900 truncate">{file.name}</p>
-                        <p className="text-sm text-gray-600">Type: {file.type}</p>
-                        <p className="text-xs text-gray-500">
-                          Ajouté le {file.uploadDate} par {file.uploadedBy}
-                        </p>
-                        <p className="text-xs text-gray-500">{file.size}</p>
+          {files.length === 0 ? (
+            <div className="text-center py-8 text-gray-500 bg-gray-50 rounded-xl">
+              <FileText className="w-12 h-12 mx-auto mb-2 opacity-30" />
+              <p>Aucun fichier attaché</p>
+              <p className="text-sm mt-1">Cliquez sur "Ajouter un fichier" pour commencer</p>
+            </div>
+          ) : (
+            <div className="max-h-[400px] overflow-y-auto custom-scrollbar pr-2">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {files.map((file, i) => (
+                  <motion.div
+                    key={file.id}
+                    initial={{ opacity: 0, scale: 0.9 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    transition={{ delay: i * 0.05 }}
+                    className="border-2 border-gray-200 rounded-xl p-4 hover:border-blue-400 transition-all hover:shadow-md group relative"
+                  >
+                    {/* Tooltip au survol */}
+                    <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-2 bg-gray-900 text-white text-xs rounded-lg opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity duration-200 z-10 whitespace-nowrap max-w-xs truncate">
+                      {file.name}
+                    </div>
+
+                    <div className="flex items-start justify-between mb-3">
+                      <div className="flex items-center gap-2 flex-1 min-w-0">
+                        <div className="w-10 h-10 bg-gradient-to-r from-blue-500 to-purple-600 rounded-lg flex items-center justify-center flex-shrink-0">
+                          <FileText className="w-5 h-5 text-white" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          {editingFileName === file.id ? (
+                            <input
+                              type="text"
+                              value={newFileName}
+                              onChange={(e) => setNewFileName(e.target.value)}
+                              onBlur={() => handleRenameFile(file.id)}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') handleRenameFile(file.id);
+                                if (e.key === 'Escape') {
+                                  setEditingFileName(null);
+                                  setNewFileName('');
+                                }
+                              }}
+                              autoFocus
+                              className="w-full px-2 py-1 border-2 border-blue-400 rounded text-sm focus:outline-none"
+                            />
+                          ) : (
+                            <p className="text-sm font-medium text-gray-900 truncate">
+                              {file.name.length > 20 ? `${file.name.substring(0, 20)}...` : file.name}
+                            </p>
+                          )}
+                          <p className="text-xs text-gray-500 mt-0.5">{file.size}</p>
+                        </div>
                       </div>
                     </div>
-                    <div className="flex gap-2">
-                      <button
-                        className="p-2 text-blue-600 hover:bg-blue-100 rounded-lg"
-                        title="Voir"
+
+                    <div className="flex items-center justify-between text-xs text-gray-500 mb-3">
+                      <span className="truncate">{file.uploadDate}</span>
+                      <span className="text-blue-600 truncate ml-2">{file.uploadedBy}</span>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2">
+                      <motion.button
+                        whileHover={{ scale: 1.05 }}
+                        whileTap={{ scale: 0.95 }}
+                        onClick={() => alert(`👁️ Affichage de ${file.name}\n\nType: ${file.type}\nTaille: ${file.size}\nDate: ${file.uploadDate}\n\n(Fonctionnalité de prévisualisation)`)}
+                        className="flex items-center justify-center gap-1 px-3 py-2 bg-green-50 text-green-600 rounded-lg hover:bg-green-100 transition-colors"
+                        title="Afficher"
                       >
                         <Eye className="w-4 h-4" />
-                      </button>
-                      <button
-                        className="p-2 text-green-600 hover:bg-green-100 rounded-lg"
+                        <span className="text-xs">Afficher</span>
+                      </motion.button>
+                      <motion.button
+                        whileHover={{ scale: 1.05 }}
+                        whileTap={{ scale: 0.95 }}
+                        onClick={() => alert(`📥 Téléchargement de ${file.name}`)}
+                        className="flex items-center justify-center gap-1 px-3 py-2 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition-colors"
                         title="Télécharger"
                       >
                         <Download className="w-4 h-4" />
-                      </button>
+                        <span className="text-xs">Télécharger</span>
+                      </motion.button>
                       {canUploadFiles && (
-                        <button
-                          onClick={() => handleDeleteFile(file.id)}
-                          className="p-2 text-red-600 hover:bg-red-100 rounded-lg"
-                          title="Supprimer"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
+                        <>
+                          <motion.button
+                            whileHover={{ scale: 1.05 }}
+                            whileTap={{ scale: 0.95 }}
+                            onClick={() => {
+                              setEditingFileName(file.id);
+                              setNewFileName(file.name);
+                            }}
+                            className="flex items-center justify-center gap-1 px-3 py-2 bg-gray-50 text-gray-600 rounded-lg hover:bg-gray-100 transition-colors"
+                            title="Renommer"
+                          >
+                            <Edit2 className="w-4 h-4" />
+                            <span className="text-xs">Renommer</span>
+                          </motion.button>
+                          <motion.button
+                            whileHover={{ scale: 1.05 }}
+                            whileTap={{ scale: 0.95 }}
+                            onClick={() => handleDeleteFile(file.id)}
+                            className="flex items-center justify-center gap-1 px-3 py-2 bg-red-50 text-red-600 rounded-lg hover:bg-red-100 transition-colors"
+                            title="Supprimer"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                            <span className="text-xs">Supprimer</span>
+                          </motion.button>
+                        </>
                       )}
                     </div>
-                  </div>
-                </motion.div>
-              ))
-            ) : (
-              <p className="text-gray-500 text-center py-4 col-span-2">
-                Aucun fichier ajouté
-              </p>
-            )}
-          </div>
+                  </motion.div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Upload file dialog */}
         <AnimatePresence>
           {showUploadDialog && (
-            <FileUploader
+            <ModernFileUploader
               onUpload={handleUploadFile}
               onClose={() => setShowUploadDialog(false)}
             />

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { motion } from 'motion/react';
 import { Check, DollarSign, CreditCard, Building, Gift } from 'lucide-react';
 
@@ -8,6 +8,7 @@ interface Appointment {
   patientPhone: string;
   time: string;
   type: 'consultation' | 'control';
+  pays?: string;
 }
 
 interface AppointmentConfirmationProps {
@@ -20,6 +21,48 @@ interface AppointmentConfirmationProps {
   onCancel: () => void;
 }
 
+// Conventions par pays (les mêmes que dans RegisterPage)
+const conventionsByCountry: { [key: string]: string[] } = {
+  'Tunisie': [
+    'CNAM',
+    'STAR Assurances',
+    'COMAR Assurances',
+    'GAT Assurances',
+    'MAGHREBIA Assurances',
+    'AMI Assurances',
+    'CARTE Assurances',
+    'MAE',
+    'ASTREE Assurances',
+    'BIAT Assurances',
+    'Zitouna Takaful',
+    'Globemed Tunisia',
+    'NextCare',
+    'Help Group',
+  ],
+  'Libye': [
+    'Libya Insurance Company (LIC)',
+    'Sahara Insurance',
+    'United Insurance Company (UIC)',
+    'Libyana Insurance',
+    'Trust Insurance Libya',
+    'Al-Afriqiyah Insurance',
+  ],
+  'Algérie': [
+    'SAA',
+    'CAAR',
+    'CAAT',
+    'CNMA',
+    'Alliance Assurances',
+    'CIAR',
+    'Trust Algérie',
+    'Salama Assurances',
+    'AXA Algérie',
+    'Macir Vie',
+    'Le Mutualiste',
+    'CHIFA (CNAS)',
+  ],
+};
+
 export function AppointmentConfirmation({
   appointment,
   doctorTariff,
@@ -29,6 +72,13 @@ export function AppointmentConfirmation({
   const [paymentType, setPaymentType] = useState<'normal' | 'cnam' | 'insurance' | 'free'>('normal');
   const [amountPaid, setAmountPaid] = useState(doctorTariff.toString());
   const [showAmountField, setShowAmountField] = useState(false);
+  const [selectedInsurance, setSelectedInsurance] = useState<string>('');
+
+  // Récupérer les conventions disponibles selon le pays du patient
+  const availableInsurances = useMemo(() => {
+    if (!appointment.pays) return [];
+    return conventionsByCountry[appointment.pays] || [];
+  }, [appointment.pays]);
 
   const handlePaymentTypeChange = (type: 'normal' | 'cnam' | 'insurance' | 'free') => {
     setPaymentType(type);
@@ -64,27 +114,14 @@ export function AppointmentConfirmation({
     return 0;
   };
 
-  const paymentOptions = [
+  // Options de paiement de base (toujours disponibles)
+  const basePaymentOptions = [
     {
       type: 'normal' as const,
       label: 'Paiement normal',
       icon: DollarSign,
       color: 'from-blue-500 to-cyan-500',
       description: 'Paiement intégral par le patient',
-    },
-    {
-      type: 'cnam' as const,
-      label: 'CNAM',
-      icon: Building,
-      color: 'from-green-500 to-emerald-500',
-      description: 'Caisse nationale d\'assurance maladie',
-    },
-    {
-      type: 'insurance' as const,
-      label: 'Assurance',
-      icon: CreditCard,
-      color: 'from-purple-500 to-pink-500',
-      description: 'Assurance privée',
     },
     {
       type: 'free' as const,
@@ -94,6 +131,20 @@ export function AppointmentConfirmation({
       description: 'Consultation gratuite',
     },
   ];
+
+  // Options de paiement avec assurance (selon le pays du patient)
+  const insurancePaymentOptions = appointment.pays && availableInsurances.length > 0 ? [
+    {
+      type: 'insurance' as const,
+      label: 'Assurance',
+      icon: CreditCard,
+      color: 'from-purple-500 to-pink-500',
+      description: `Assurances ${appointment.pays}`,
+    },
+  ] : [];
+
+  // Combiner toutes les options
+  const paymentOptions = [...basePaymentOptions, ...insurancePaymentOptions];
 
   return (
     <motion.div
@@ -108,7 +159,7 @@ export function AppointmentConfirmation({
         animate={{ scale: 1, opacity: 1 }}
         exit={{ scale: 0.9, opacity: 0 }}
         onClick={(e) => e.stopPropagation()}
-        className="bg-white rounded-2xl p-6 max-w-2xl w-full shadow-2xl max-h-[90vh] overflow-y-auto"
+        className="bg-white rounded-2xl p-6 max-w-2xl w-full shadow-2xl max-h-[90vh] overflow-y-auto custom-scrollbar"
       >
         <h3 className="text-gray-900 mb-4">Confirmer le rendez-vous</h3>
 
@@ -121,6 +172,11 @@ export function AppointmentConfirmation({
           <p className="text-sm text-gray-600 mt-1">
             {appointment.time} • {appointment.type === 'consultation' ? 'Consultation' : 'Contrôle'}
           </p>
+          {appointment.pays && (
+            <p className="text-sm text-blue-600 mt-1">
+              📍 Pays : {appointment.pays}
+            </p>
+          )}
         </div>
 
         {/* Payment type selection */}
@@ -159,7 +215,68 @@ export function AppointmentConfirmation({
           </div>
         </div>
 
-        {/* Amount paid field for CNAM/Insurance */}
+        {/* Sélection de l'assurance si type = insurance */}
+        {paymentType === 'insurance' && availableInsurances.length > 0 && (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: 'auto' }}
+            exit={{ opacity: 0, height: 0 }}
+            className="mb-4"
+          >
+            <label className="block text-sm text-gray-700 mb-2">Sélectionner l'assurance</label>
+            <div className="bg-gradient-to-br from-blue-50 to-purple-50 rounded-2xl border-2 border-blue-200 p-3">
+              <div 
+                className="max-h-[150px] overflow-y-auto space-y-2 custom-scrollbar pr-2"
+                style={{
+                  scrollbarWidth: 'thin',
+                  scrollbarColor: '#3b82f6 #e5e7eb',
+                }}
+              >
+                {availableInsurances.map((insurance) => (
+                  <motion.button
+                    key={insurance}
+                    type="button"
+                    onClick={() => setSelectedInsurance(insurance)}
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                    className={`w-full p-2.5 rounded-xl border-2 transition-all text-left text-sm ${
+                      selectedInsurance === insurance
+                        ? 'bg-gradient-to-br from-blue-500 to-purple-600 border-blue-500 text-white shadow-lg'
+                        : 'bg-white border-gray-200 text-gray-700 hover:border-blue-300 hover:shadow-sm'
+                    }`}
+                  >
+                    <div className="flex items-center gap-2">
+                      <div
+                        className={`w-4 h-4 rounded-md border-2 flex items-center justify-center flex-shrink-0 ${
+                          selectedInsurance === insurance
+                            ? 'bg-white border-white'
+                            : 'border-gray-300'
+                        }`}
+                      >
+                        {selectedInsurance === insurance && (
+                          <svg
+                            className="w-3 h-3 text-blue-600"
+                            fill="none"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth="3"
+                            viewBox="0 0 24 24"
+                            stroke="currentColor"
+                          >
+                            <path d="M5 13l4 4L19 7" />
+                          </svg>
+                        )}
+                      </div>
+                      <span>{insurance}</span>
+                    </div>
+                  </motion.button>
+                ))}
+              </div>
+            </div>
+          </motion.div>
+        )}
+
+        {/* Amount paid field for Insurance */}
         {showAmountField && (
           <motion.div
             initial={{ opacity: 0, height: 0 }}
@@ -187,7 +304,7 @@ export function AppointmentConfirmation({
         )}
 
         {/* Reimbursement calculation */}
-        {(paymentType === 'cnam' || paymentType === 'insurance') && amountPaid && (
+        {paymentType === 'insurance' && amountPaid && (
           <motion.div
             initial={{ opacity: 0, y: -10 }}
             animate={{ opacity: 1, y: 0 }}
@@ -207,7 +324,7 @@ export function AppointmentConfirmation({
               <div className="flex items-center justify-between text-sm">
                 <span className="text-gray-700">Organisme payeur :</span>
                 <span className="text-gray-900">
-                  <strong>{paymentType === 'cnam' ? 'CNAM' : 'Assurance'}</strong>
+                  <strong>{selectedInsurance || 'Assurance'}</strong>
                 </span>
               </div>
             </div>
@@ -231,6 +348,15 @@ export function AppointmentConfirmation({
           <div className="bg-orange-50 border-2 border-orange-200 rounded-xl p-3 mb-4">
             <p className="text-sm text-orange-700">
               ⚠️ Cette consultation sera enregistrée comme gratuite (0 TND)
+            </p>
+          </div>
+        )}
+
+        {/* Message si pas de pays sélectionné */}
+        {!appointment.pays && (
+          <div className="bg-yellow-50 border-2 border-yellow-200 rounded-xl p-3 mb-4">
+            <p className="text-sm text-yellow-700">
+              ℹ️ Aucun pays renseigné pour ce patient. Seuls les paiements normaux et gratuits sont disponibles.
             </p>
           </div>
         )}

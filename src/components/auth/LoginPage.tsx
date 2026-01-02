@@ -1,15 +1,9 @@
-import React, { useState } from "react";
+import { useState } from "react";
 import { motion } from "motion/react";
-import {
-  Stethoscope,
-  Lock,
-  Mail,
-  ArrowRight,
-  Activity,
-  Heart,
-  Pill,
-} from "lucide-react";
+import { Stethoscope, Mail, Lock, ArrowRight } from "lucide-react";
 import { FloatingElement } from "../ui/FloatingElement";
+import { useLanguage } from "../../contexts/LanguageContext";
+import { LanguageSelector } from "../common/LanguageSelector";
 
 interface LoginPageProps {
   onLogin: (email: string, password: string) => Promise<void>;
@@ -24,6 +18,7 @@ export function LoginPage({
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const { t } = useLanguage();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -33,7 +28,7 @@ export function LoginPage({
     try {
       await onLogin(email, password);
     } catch (err: any) {
-      setError(err.message || "Erreur de connexion");
+      setError(err.message || t('error'));
     } finally {
       setLoading(false);
     }
@@ -41,6 +36,11 @@ export function LoginPage({
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-600 via-purple-600 to-pink-500 flex items-center justify-center p-4 overflow-hidden relative">
+      {/* Language Selector - Fixed Top Right */}
+      <div className="fixed top-4 right-4 z-50">
+        <LanguageSelector />
+      </div>
+      
       {/* Animated background elements - more subtle */}
       <div className="absolute inset-0 overflow-hidden">
         <motion.div
@@ -152,7 +152,7 @@ export function LoginPage({
               transition={{ delay: 0.3 }}
               className="text-gray-600"
             >
-              Gestion intelligente de cabinet médical
+              {t('medical_management')}
             </motion.p>
           </div>
 
@@ -175,7 +175,7 @@ export function LoginPage({
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  placeholder="Email"
+                  placeholder={t('email')}
                   required
                   className="w-full pl-12 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
                 />
@@ -187,7 +187,7 @@ export function LoginPage({
                   type="password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  placeholder="Mot de passe"
+                  placeholder={t('password')}
                   required
                   className="w-full pl-12 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
                 />
@@ -205,7 +205,7 @@ export function LoginPage({
                 <div className="w-6 h-6 border-2 border-white border-t-transparent rounded-full animate-spin" />
               ) : (
                 <>
-                  Se connecter
+                  {t('sign_in')}
                   <ArrowRight className="w-5 h-5" />
                 </>
               )}
@@ -215,39 +215,24 @@ export function LoginPage({
           {/* Register Link */}
           <div className="mt-6 text-center">
             <p className="text-gray-600 mb-3">
-              Pas encore de compte ?
+              {t('no_account')}
             </p>
             <div className="flex flex-col gap-2">
               <button
                 onClick={onShowRegister}
                 className="text-blue-600 hover:underline"
               >
-                Créer un compte Médecin
+                {t('create_doctor_account')}
               </button>
               <button
                 onClick={onShowRegister}
                 className="text-purple-600 hover:underline"
               >
-                Créer un compte Secrétaire
+                {t('create_secretary_account')}
               </button>
             </div>
           </div>
         </div>
-
-        {/* Demo Credentials */}
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.3 }}
-          className="mt-6 bg-white/80 backdrop-blur-lg rounded-2xl p-6 border border-white/30"
-        >
-          <p className="text-gray-700 mb-3">Comptes de démonstration :</p>
-          <div className="space-y-2 text-sm">
-            <p className="text-gray-600"><strong>Admin:</strong> admin@medicab.tn / admin123</p>
-            <p className="text-gray-600"><strong>Médecin:</strong> dr.ben.ali@medicab.tn / doctor123</p>
-            <p className="text-gray-600"><strong>Secrétaire:</strong> fatma.sec@medicab.tn / secretary123</p>
-          </div>
-        </motion.div>
       </motion.div>
     </div>
   );

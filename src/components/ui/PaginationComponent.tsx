@@ -120,7 +120,7 @@ export function PaginationComponent({
 
             return (
               <motion.button
-                key={page}
+                key={`page-${page}`}
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
                 onClick={() => onPageChange(page as number)}

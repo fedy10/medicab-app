@@ -2,10 +2,19 @@ import { useState } from 'react';
 import { motion } from 'motion/react';
 import { X, Printer, Edit2, Save } from 'lucide-react';
 import { getSpecialtyIcon, getSpecialtyColor } from './MedicalSpecialtiesSelector';
+import { ChronicDiseasesSelector } from '../ui/ChronicDiseasesSelector';
+
+interface Disease {
+  name: string;
+  isChronic: boolean;
+  category?: string;
+}
 
 interface PrintableDocumentProps {
   type: 'prescription' | 'analysis' | 'imaging' | 'referral';
   patientName: string;
+  patientAge?: number;
+  patientDiseases?: Disease[];
   doctorInfo: {
     name: string;
     specialty: string;
@@ -16,6 +25,7 @@ interface PrintableDocumentProps {
   specialty?: string;
   onClose: () => void;
   onContentChanged?: (newContent: string, wasModified: boolean) => void;
+  onDiseasesChanged?: (diseases: Disease[]) => void;
 }
 
 const getTitleByType = (type: string) => {
@@ -36,15 +46,20 @@ const getTitleByType = (type: string) => {
 export function PrintableDocument({
   type,
   patientName,
+  patientAge,
+  patientDiseases,
   doctorInfo,
   initialContent,
   specialty,
   onClose,
   onContentChanged,
+  onDiseasesChanged,
 }: PrintableDocumentProps) {
   const [content, setContent] = useState(initialContent);
   const [isEditing, setIsEditing] = useState(true);
   const [isPrinting, setIsPrinting] = useState(false);
+  const [diseases, setDiseases] = useState<Disease[]>(patientDiseases || []);
+  const [isEditingDiseases, setIsEditingDiseases] = useState(false);
 
   const currentDate = new Date().toLocaleDateString('fr-FR', {
     day: '2-digit',
@@ -54,9 +69,14 @@ export function PrintableDocument({
 
   const handleClose = () => {
     const wasModified = content !== initialContent;
+    const diseasesModified = JSON.stringify(diseases) !== JSON.stringify(patientDiseases || []);
     
     if (wasModified && onContentChanged) {
       onContentChanged(content, true);
+    }
+    
+    if (diseasesModified && onDiseasesChanged) {
+      onDiseasesChanged(diseases);
     }
     
     onClose();
@@ -64,13 +84,19 @@ export function PrintableDocument({
 
   const handlePrint = () => {
     const wasModified = content !== initialContent;
+    const diseasesModified = JSON.stringify(diseases) !== JSON.stringify(patientDiseases || []);
     
     if (wasModified && onContentChanged) {
       onContentChanged(content, true);
     }
     
+    if (diseasesModified && onDiseasesChanged) {
+      onDiseasesChanged(diseases);
+    }
+    
     // Forcer le mode aperçu
     setIsEditing(false);
+    setIsEditingDiseases(false);
     setIsPrinting(true);
     
     // Imprimer après rendu
@@ -288,18 +314,109 @@ export function PrintableDocument({
               <div className="print-patient">
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
                   <div>
-                    <p style={{ fontSize: '12px', color: '#6B7280', marginBottom: '4px' }}>PATIENT</p>
-                    <p style={{ fontSize: '16px', fontWeight: 600, color: '#111827' }}>
+                    <p style={{ fontSize: '12px', color: '#6B7280', marginBottom: '4px', fontWeight: '600' }}>PATIENT</p>
+                    <p style={{ fontSize: '16px', fontWeight: 600, color: '#111827', marginBottom: '6px' }}>
                       {patientName}
                     </p>
+                    {patientAge && (
+                      <p style={{ fontSize: '14px', color: '#6B7280', marginBottom: '8px' }}>
+                        <strong>Âge:</strong> {patientAge} ans
+                      </p>
+                    )}
                   </div>
                   <div style={{ textAlign: 'right' }}>
-                    <p style={{ fontSize: '12px', color: '#6B7280', marginBottom: '4px' }}>DATE</p>
+                    <p style={{ fontSize: '12px', color: '#6B7280', marginBottom: '4px', fontWeight: '600' }}>DATE</p>
                     <p style={{ fontSize: '16px', fontWeight: 600, color: '#111827' }}>
                       {currentDate}
                     </p>
                   </div>
                 </div>
+
+                {/* Medical History Section - Full Width */}
+                {diseases && diseases.length > 0 && (
+                  <div style={{ marginTop: '20px', paddingTop: '16px', borderTop: '1px solid #E5E7EB' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
+                      <p style={{ fontSize: '13px', fontWeight: 600, color: '#374151' }}>ANTÉCÉDENTS MÉDICAUX</p>
+                      {type === 'referral' && (
+                        <button
+                          onClick={() => setIsEditingDiseases(!isEditingDiseases)}
+                          className="no-print px-3 py-1.5 text-sm bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors flex items-center gap-2"
+                          type="button"
+                        >
+                          {isEditingDiseases ? (
+                            <>
+                              <span>✓</span>
+                              <span>Valider</span>
+                            </>
+                          ) : (
+                            <>
+                              <span>✏️</span>
+                              <span>Modifier</span>
+                            </>
+                          )}
+                        </button>
+                      )}
+                    </div>
+                    
+                    {isEditingDiseases && type === 'referral' ? (
+                      <div className="no-print mb-4">
+                        <ChronicDiseasesSelector
+                          selectedDiseases={diseases}
+                          onChange={setDiseases}
+                          label=""
+                          isEditing={true}
+                        />
+                      </div>
+                    ) : (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', backgroundColor: '#F9FAFB', padding: '12px', borderRadius: '8px' }}>
+                        {diseases.filter(d => d.isChronic).length > 0 && (
+                          <div>
+                            <p style={{ fontSize: '11px', fontWeight: 600, color: '#DC2626', marginBottom: '6px' }}>• Maladies chroniques:</p>
+                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                              {diseases.filter(d => d.isChronic).map((disease, index) => (
+                                <span 
+                                  key={index} 
+                                  style={{ 
+                                    fontSize: '12px', 
+                                    color: '#991B1B', 
+                                    backgroundColor: '#FEE2E2',
+                                    padding: '4px 10px',
+                                    borderRadius: '6px',
+                                    display: 'inline-block'
+                                  }}
+                                >
+                                  {disease.name}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                        {diseases.filter(d => !d.isChronic).length > 0 && (
+                          <div style={{ marginTop: diseases.filter(d => d.isChronic).length > 0 ? '8px' : '0' }}>
+                            <p style={{ fontSize: '11px', fontWeight: 600, color: '#2563EB', marginBottom: '6px' }}>• Autres affections:</p>
+                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                              {diseases.filter(d => !d.isChronic).map((disease, index) => (
+                                <span 
+                                  key={index} 
+                                  style={{ 
+                                    fontSize: '12px', 
+                                    color: '#1E40AF', 
+                                    backgroundColor: '#DBEAFE',
+                                    padding: '4px 10px',
+                                    borderRadius: '6px',
+                                    display: 'inline-block'
+                                  }}
+                                >
+                                  {disease.name}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
 
               {/* Content */}
