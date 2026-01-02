@@ -233,6 +233,21 @@ export function LoginPage({
             </div>
           </div>
         </div>
+
+        {/* Demo Credentials */}
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.3 }}
+          className="mt-6 bg-white/80 backdrop-blur-lg rounded-2xl p-6 border border-white/30"
+        >
+          <p className="text-gray-700 mb-3">{t('demo_accounts')}</p>
+          <div className="space-y-2 text-sm">
+            <p className="text-gray-600"><strong>{t('admin')}:</strong> admin@medicab.tn / admin123</p>
+            <p className="text-gray-600"><strong>{t('doctor')}:</strong> dr.ben.ali@medicab.tn / doctor123</p>
+            <p className="text-gray-600"><strong>{t('secretary')}:</strong> fatma.sec@medicab.tn / secretary123</p>
+          </div>
+        </motion.div>
       </motion.div>
     </div>
   );

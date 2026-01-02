@@ -3,6 +3,9 @@
 -- Application de Gestion de Cabinet Médical
 -- ============================================
 
+-- Activer Row Level Security
+ALTER DATABASE postgres SET "app.jwt_secret" TO 'your-secret-jwt-token-with-at-least-32-characters-long';
+
 -- ============================================
 -- 1. TABLE PROFILES (Utilisateurs)
 -- ============================================
@@ -254,24 +257,29 @@ USING (auth.uid() = id);
 CREATE POLICY "Admins can view all profiles"
 ON public.profiles FOR SELECT
 USING (
-  (auth.jwt() -> 'user_metadata' ->> 'role') = 'admin'
+  EXISTS (
+    SELECT 1 FROM public.profiles
+    WHERE id = auth.uid() AND role = 'admin'
+  )
 );
 
 -- Les médecins peuvent voir leurs secrétaires
 CREATE POLICY "Doctors can view their secretaries"
 ON public.profiles FOR SELECT
 USING (
-  (auth.jwt() -> 'user_metadata' ->> 'role') = 'doctor' 
-  AND assigned_doctor_id = auth.uid()
+  EXISTS (
+    SELECT 1 FROM public.profiles
+    WHERE id = auth.uid() AND role = 'doctor'
+  ) AND assigned_doctor_id = auth.uid()
 );
 
 -- Les secrétaires peuvent voir leur médecin
 CREATE POLICY "Secretaries can view their doctor"
 ON public.profiles FOR SELECT
 USING (
-  (auth.jwt() -> 'user_metadata' ->> 'role') = 'secretary' 
-  AND id = (
-    SELECT assigned_doctor_id FROM public.profiles WHERE id = auth.uid()
+  EXISTS (
+    SELECT 1 FROM public.profiles
+    WHERE id = auth.uid() AND role = 'secretary' AND assigned_doctor_id = profiles.id
   )
 );
 
@@ -284,7 +292,10 @@ USING (auth.uid() = id);
 CREATE POLICY "Admins can update all profiles"
 ON public.profiles FOR UPDATE
 USING (
-  (auth.jwt() -> 'user_metadata' ->> 'role') = 'admin'
+  EXISTS (
+    SELECT 1 FROM public.profiles
+    WHERE id = auth.uid() AND role = 'admin'
+  )
 );
 
 -- ============================================

@@ -37,126 +37,37 @@ export interface FileAttachment {
 export const authService = {
   // Connexion
   async login(email: string, password: string) {
-    try {
-      console.log('🔑 Étape 1 : Appel signInWithPassword...');
-      
-      // Timeout de sécurité : si la promesse ne se résout pas en 10 secondes, on force une erreur
-      const loginPromise = supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    });
 
-      const timeoutPromise = new Promise((_, reject) => {
-        setTimeout(() => reject(new Error('Timeout: La connexion a pris trop de temps')), 10000);
-      });
-
-      const { data, error } = await Promise.race([loginPromise, timeoutPromise]) as any;
-
-      console.log('📦 Étape 2 : Réponse reçue', { 
-        hasData: !!data, 
-        hasError: !!error,
-        hasUser: !!data?.user 
-      });
-
-      if (error) {
-        console.error('❌ Erreur Supabase:', error);
-        // Messages d'erreur traduits
-        if (error.message.includes('Invalid login credentials')) {
-          return { success: false, error: 'Email ou mot de passe incorrect' };
-        } else if (error.message.includes('Email not confirmed')) {
-          return { success: false, error: 'Email not confirmed' };
-        } else {
-          return { success: false, error: error.message };
-        }
-      }
-
-      if (!data.user) {
-        console.error('❌ Pas d\'utilisateur dans la réponse');
-        return { success: false, error: 'Utilisateur non trouvé' };
-      }
-
-      console.log('✅ Étape 3 : Utilisateur trouvé', data.user.email);
-
-      // Vérifier si l'email est confirmé
-      if (!data.user.email_confirmed_at) {
-        console.warn('⚠️ Email non confirmé');
-        await supabase.auth.signOut();
-        return { 
-          success: false, 
-          error: '⚠️ Veuillez vérifier votre email. Un lien de confirmation vous a été envoyé.' 
-        };
-      }
-
-      console.log('✅ Étape 4 : Email confirmé');
-      console.log('🔍 Étape 5 : Récupération du profil pour ID:', data.user.id);
-
-      // Récupérer le profil
-      const { data: profile, error: profileError } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', data.user.id)
-        .single();
-
-      console.log('📊 Étape 6 : Profil récupéré', { 
-        hasProfile: !!profile, 
-        hasError: !!profileError,
-        profile: profile
-      });
-
-      if (profileError) {
-        console.error('❌ Erreur lors de la récupération du profil:', profileError);
-        
-        // Si le profil n'existe pas, on le crée
-        if (profileError.code === 'PGRST116') {
-          console.log('⚠️ Profil inexistant, création automatique...');
-          
-          const { data: newProfile, error: createError } = await supabase
-            .from('profiles')
-            .insert({
-              id: data.user.id,
-              email: data.user.email!,
-              name: data.user.user_metadata?.name || 'Utilisateur',
-              role: data.user.user_metadata?.role || 'doctor',
-              status: 'active',
-            })
-            .select()
-            .single();
-          
-          if (createError) {
-            console.error('❌ Impossible de créer le profil:', createError);
-            return { success: false, error: 'Profil non trouvé. Contactez l\'administrateur.' };
-          }
-          
-          console.log('✅ Profil créé automatiquement:', newProfile);
-          return { success: true, user: data.user, profile: newProfile };
-        }
-        
-        return { success: false, error: 'Profil non trouvé. Contactez l\'administrateur.' };
-      }
-
-      if (!profile) {
-        console.error('❌ Profil vide');
-        return { success: false, error: 'Profil non trouvé. Contactez l\'administrateur.' };
-      }
-
-      // Vérifier si le compte est suspendu
-      if (profile.status === 'suspended') {
-        console.warn('⚠️ Compte suspendu');
-        await supabase.auth.signOut();
-        return { success: false, error: 'Votre compte a été suspendu. Contactez l\'administrateur.' };
-      }
-
-      console.log('✅ Étape 7 : Connexion réussie !', {
-        user: data.user.email,
-        role: profile.role,
-        status: profile.status
-      });
-
-      return { success: true, user: data.user, profile };
-    } catch (error: any) {
-      console.error('💥 Exception dans login():', error);
-      return { success: false, error: 'Erreur de connexion. Vérifiez votre configuration Supabase.' };
+    if (error) {
+      return { success: false, error: error.message };
     }
+
+    if (!data.user) {
+      return { success: false, error: 'Utilisateur non trouvé' };
+    }
+
+    // Récupérer le profil
+    const { data: profile, error: profileError } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('id', data.user.id)
+      .single();
+
+    if (profileError || !profile) {
+      return { success: false, error: 'Profil non trouvé' };
+    }
+
+    // Vérifier si le compte est suspendu
+    if (profile.status === 'suspended') {
+      await supabase.auth.signOut();
+      return { success: false, error: 'Votre compte a été suspendu. Contactez l\'administrateur.' };
+    }
+
+    return { success: true, user: data.user, profile };
   },
 
   // Inscription
@@ -223,46 +134,19 @@ export const authService = {
 
   // Récupérer la session actuelle
   async getCurrentSession() {
-    try {
-      console.log('🔍 getCurrentSession: Début...');
-      
-      const { data: { session }, error } = await supabase.auth.getSession();
-      
-      console.log('📦 getSession terminé:', session ? 'Session trouvée' : 'Pas de session', error || '');
-      
-      if (error) {
-        console.error('❌ Erreur getSession:', error);
-        return null;
-      }
-      
-      if (!session) {
-        console.log('✅ Pas de session active');
-        return null;
-      }
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) return null;
 
-      console.log('👤 Récupération du profil pour:', session.user.email);
-      
-      const { data: profile, error: profileError } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', session.user.id)
-        .single();
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('id', session.user.id)
+      .single();
 
-      if (profileError) {
-        console.error('❌ Erreur récupération profil:', profileError);
-        return null;
-      }
-
-      console.log('✅ Session et profil récupérés avec succès');
-      
-      return {
-        user: session.user,
-        profile: profile || null,
-      };
-    } catch (error) {
-      console.error('💥 Exception dans getCurrentSession:', error);
-      return null;
-    }
+    return {
+      user: session.user,
+      profile: profile || null,
+    };
   },
 
   // Récupérer l'utilisateur actuel
