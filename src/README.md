@@ -1,206 +1,314 @@
-# 🏥 MEDICAB - Application de Gestion de Cabinet Médical
+# 🏥 MEDICAB - Gestion de Cabinet Médical
 
-Application moderne de gestion de cabinet médical multi-utilisateur avec interfaces 3D interactives et base de données cloud Supabase.
-
-## 🚀 Démarrage Rapide
-
-### ⚡ Configuration en 5 minutes
-
-**L'application nécessite une configuration Supabase avant de démarrer.**
-
-👉 **Suivez le guide** : [CONFIGURATION_RAPIDE.md](./CONFIGURATION_RAPIDE.md)
-
-### 📋 Étapes résumées :
-
-1. **Créer un projet Supabase** sur [supabase.com](https://supabase.com)
-2. **Configurer le fichier `.env`** avec vos identifiants
-3. **Exécuter le schema SQL** dans Supabase SQL Editor
-4. **Redémarrer l'application** : `npm run dev`
+Application moderne de gestion de cabinet médical multi-utilisateur avec interface 3D interactive, entièrement connectée à Supabase.
 
 ## ✨ Fonctionnalités
 
 ### 👨‍⚕️ Pour les Médecins
-- 📅 Gestion des rendez-vous avec agenda visuel
-- 👥 Gestion complète des patients avec dossiers médicaux
-- 📝 Consultations avec assistant IA
-- 🎤 Reconnaissance vocale pour les notes médicales
-- 💰 Suivi des revenus avec graphiques 3D
-- 📧 Système de référencement entre médecins
-- 💬 Chat privé avec l'administrateur et les secrétaires
+- 📋 Gestion complète des patients
+- 📅 Agenda intelligent avec gestion des rendez-vous
+- 🩺 Dossiers de consultations détaillés
+- 💰 Suivi des revenus avec statistiques 3D
+- 📨 Lettres d'orientation
+- 💬 Chat privé avec collègues et secrétaires
+- 🎤 Reconnaissance vocale pour les notes
+- 🌐 Interface multilingue (FR, EN, AR)
 
-### 👨‍💼 Pour l'Administrateur
-- 👨‍⚕️ Gestion des médecins (validation, suspension)
-- 📊 Tableau de bord statistiques global
-- 💵 Vue d'ensemble des revenus de tous les médecins
-- 👥 Gestion des utilisateurs
-- 💬 Chat avec tous les médecins
+### 🔐 Pour l'Administrateur
+- 👥 Gestion des médecins (validation, suspension)
+- 📊 Vue d'ensemble des activités
+- 💬 Communication avec les médecins
+- 📈 Statistiques globales
 
-### 👩‍💼 Pour les Secrétaires
+### 📝 Pour les Secrétaires
 - 📅 Gestion de l'agenda du médecin assigné
-- 👥 Gestion des patients
+- 👤 Gestion des patients
 - 📞 Prise de rendez-vous
-- 💬 Chat avec le médecin
+- 💬 Communication avec le médecin
 
-### 🌍 Système Multilingue
-- 🇫🇷 Français
-- 🇬🇧 Anglais
-- 🇸🇦 Arabe
-- Plus de 700 traductions
+## 🚀 Démarrage Rapide
 
-## 🛠️ Technologies
+### 1. Prérequis
 
-- **Frontend** : React + TypeScript + Vite
-- **UI** : Tailwind CSS + Motion (Framer Motion)
-- **Base de données** : Supabase (PostgreSQL)
-- **Authentification** : Supabase Auth
-- **3D/Animations** : Motion/React
-- **Charts** : Recharts
-- **État** : React Context + Hooks
+- Node.js 18+ et npm
+- Un compte Supabase (gratuit)
 
-## 📦 Installation
+### 2. Installation
 
 ```bash
-# 1. Installer les dépendances
+# Cloner le projet
+git clone <votre-repo>
+cd medicab
+
+# Installer les dépendances
 npm install
+```
 
-# 2. Configurer Supabase (voir CONFIGURATION_RAPIDE.md)
-# - Créer un projet sur supabase.com
-# - Modifier le fichier .env
-# - Exécuter supabase/schema.sql
+### 3. Configuration Supabase
 
-# 3. Démarrer l'application
+#### a) Créer un projet Supabase
+
+1. Aller sur [supabase.com](https://supabase.com)
+2. Créer un nouveau projet
+3. Attendre la fin de la création (2-3 min)
+
+#### b) Exécuter le Schema SQL
+
+1. Dans Supabase, aller dans **SQL Editor**
+2. Copier-coller le schema SQL fourni
+3. Exécuter (Run)
+
+#### c) Configurer l'application
+
+```bash
+# Copier le template de configuration
+cp .env.example .env
+
+# Éditer .env et ajouter vos identifiants Supabase
+# (disponibles dans Settings → API)
+```
+
+Votre fichier `.env` doit contenir :
+
+```env
+VITE_SUPABASE_URL=https://xxx.supabase.co
+VITE_SUPABASE_ANON_KEY=eyJhbGc...
+```
+
+#### d) Créer le premier admin
+
+Dans Supabase → Authentication → Users :
+1. Créer un utilisateur
+2. Dans Table Editor → profiles :
+   - Mettre `role = 'admin'`
+   - Mettre `status = 'active'`
+
+### 4. Lancer l'application
+
+```bash
 npm run dev
 ```
 
+L'application sera disponible sur `http://localhost:5173`
+
 ## 📚 Documentation
 
-| Fichier | Description |
-|---------|-------------|
-| **[CONFIGURATION_RAPIDE.md](./CONFIGURATION_RAPIDE.md)** | ⚡ Guide de démarrage 5 minutes |
-| **[PROCHAINES_ETAPES.md](./PROCHAINES_ETAPES.md)** | 📋 Instructions détaillées |
-| **[README_SUPABASE.md](./README_SUPABASE.md)** | 📖 Vue d'ensemble Supabase |
-| **[SUPABASE_SETUP.md](./SUPABASE_SETUP.md)** | 🔧 Configuration avancée |
-| **[MIGRATION_GUIDE.md](./MIGRATION_GUIDE.md)** | 🔄 Guide de migration |
-| **[SUPABASE_FAQ.md](./SUPABASE_FAQ.md)** | ❓ Questions fréquentes |
-| **[ERREURS_CORRIGEES.md](./ERREURS_CORRIGEES.md)** | 🐛 Résolution de problèmes |
+- **[QUICK_START.md](./QUICK_START.md)** - Guide de démarrage en 5 minutes
+- **[SETUP_CHECKLIST.md](./SETUP_CHECKLIST.md)** - Checklist complète de configuration
+- **[ARCHITECTURE.md](./ARCHITECTURE.md)** - Architecture détaillée de l'application
+- **[SERVICES_GUIDE.md](./SERVICES_GUIDE.md)** - Documentation des services Supabase
+- **[USAGE_EXAMPLES.md](./USAGE_EXAMPLES.md)** - Exemples de code pour chaque fonctionnalité
 
-## 🎯 Architecture
+## 🏗️ Stack Technique
+
+### Frontend
+- **React 18** - Framework UI
+- **TypeScript** - Type safety
+- **Vite** - Build tool ultra-rapide
+- **Tailwind CSS** - Styling
+- **Motion (Framer Motion)** - Animations
+- **Recharts** - Graphiques 3D
+- **Lucide React** - Icônes
+
+### Backend
+- **Supabase** - Backend-as-a-Service
+  - PostgreSQL (Base de données)
+  - Authentication (JWT)
+  - Row Level Security (RLS)
+  - Realtime (WebSockets)
+  - Storage (Fichiers)
+
+### Fonctionnalités Clés
+- ✅ **Authentification sécurisée** avec validation email
+- ✅ **Row Level Security** - Chaque utilisateur ne voit que ses données
+- ✅ **Temps réel** - Chat et notifications instantanés
+- ✅ **Multilingue** - Français, Anglais, Arabe (700+ traductions)
+- ✅ **Responsive** - Desktop, tablette, mobile
+- ✅ **TypeScript complet** - Type safety à 100%
+
+## 📁 Structure du Projet
 
 ```
 /
-├── components/          # Composants React
-│   ├── auth/           # Authentification (Login/Register)
-│   ├── dashboards/     # Dashboards (Admin/Médecin/Secrétaire)
-│   ├── doctor/         # Composants médecin
-│   ├── secretary/      # Composants secrétaire
-│   ├── admin/          # Composants admin
-│   └── ui/             # Composants UI réutilisables
-├── lib/                # Services et configuration
-│   ├── supabase.ts     # Client Supabase
-│   ├── database.types.ts # Types TypeScript
-│   └── services/       # Services Supabase
-├── hooks/              # React Hooks personnalisés
-├── contexts/           # React Contexts
-├── utils/              # Utilitaires
-├── supabase/           # Configuration Supabase
-│   └── schema.sql      # Schéma de base de données
-└── styles/             # Styles globaux
+├── lib/
+│   ├── supabase.ts              # Configuration Supabase
+│   ├── database.types.ts        # Types TypeScript
+│   └── services/
+│       └── supabaseService.ts   # Tous les services
+│
+├── hooks/
+│   ├── useAuth.ts               # Hook d'authentification
+│   └── useSupabase.ts           # Hooks personnalisés
+│
+├── components/
+│   ├── auth/                    # Login, Register
+│   ├── dashboards/              # Dashboards par rôle
+│   ├── doctor/                  # Vues médecin
+│   ├── admin/                   # Vues admin
+│   └── ui/                      # Composants réutilisables
+│
+├── contexts/
+│   └── LanguageContext.tsx      # Contexte multilingue
+│
+└── App.tsx                      # Point d'entrée
 ```
 
-## 🗄️ Base de données (Supabase)
+## 🎯 Services Disponibles
 
-### Tables principales :
+### Authentification
+```typescript
+import { authService } from './lib/services/supabaseService';
 
-- **profiles** - Utilisateurs (admin, médecins, secrétaires)
-- **patients** - Dossiers patients
-- **appointments** - Rendez-vous
-- **consultations** - Consultations médicales
-- **revenues** - Revenus et paiements
-- **chat_messages** - Messages privés
-- **referral_letters** - Lettres de référencement
-- **notifications** - Notifications
-- **medical_files** - Fichiers médicaux
+await authService.login(email, password);
+await authService.register(userData);
+await authService.logout();
+```
 
-Voir `supabase/schema.sql` pour le schéma complet.
+### Patients
+```typescript
+import { patientService } from './lib/services/supabaseService';
 
-## 🔐 Sécurité
+const patients = await patientService.getByDoctor(doctorId);
+const patient = await patientService.create({ name, age, ... });
+await patientService.update(id, updates);
+```
 
-- ✅ Row Level Security (RLS) activé sur toutes les tables
-- ✅ Authentification Supabase Auth
-- ✅ Validation des rôles (admin, doctor, secretary)
-- ✅ Tokens JWT sécurisés
-- ✅ Variables d'environnement (.env non commité)
+### Rendez-vous
+```typescript
+import { appointmentService } from './lib/services/supabaseService';
+
+const appointments = await appointmentService.getByDoctor(doctorId);
+const appointment = await appointmentService.create({ ... });
+await appointmentService.markAsCompleted(id);
+```
+
+### Consultations
+```typescript
+import { consultationService } from './lib/services/supabaseService';
+
+const consultations = await consultationService.getByDoctor(doctorId);
+const consultation = await consultationService.create({ ... });
+```
+
+### Revenus
+```typescript
+import { revenueService } from './lib/services/supabaseService';
+
+const stats = await revenueService.getStats(doctorId);
+const dayStats = await revenueService.getByPeriod(doctorId, 'day');
+```
+
+**Voir [SERVICES_GUIDE.md](./SERVICES_GUIDE.md) pour la documentation complète.**
+
+## 🪝 Hooks Personnalisés
+
+```typescript
+import { usePatients, useAppointments } from './hooks/useSupabase';
+
+function MyComponent() {
+  const { patients, loading, createPatient } = usePatients(doctorId);
+  const { appointments, markAsCompleted } = useAppointments(doctorId);
+  
+  // Données automatiquement chargées et synchronisées !
+}
+```
+
+**Voir [USAGE_EXAMPLES.md](./USAGE_EXAMPLES.md) pour des exemples complets.**
+
+## 🔒 Sécurité
+
+### Row Level Security (RLS)
+
+Toutes les tables ont des politiques RLS activées :
+
+- **Profiles** : Chaque utilisateur ne voit que son profil et ceux autorisés
+- **Patients** : Visibles uniquement par le médecin propriétaire et sa secrétaire
+- **Rendez-vous** : Même principe que les patients
+- **Consultations** : Médecin uniquement (données sensibles)
+- **Revenus** : Médecin uniquement
+- **Chat** : Expéditeur et destinataire uniquement
+
+### Authentification
+
+- JWT tokens sécurisés
+- Auto-refresh des tokens
+- Session persistante
+- Validation email (optionnelle)
+- Hachage des mots de passe (bcrypt)
+
+## 🌍 Multilingue
+
+L'application supporte 3 langues :
+- 🇫🇷 Français
+- 🇬🇧 Anglais
+- 🇸🇦 Arabe (RTL supporté)
+
+Plus de 700 traductions intégrées.
+
+## 📱 Responsive Design
+
+L'application s'adapte automatiquement à tous les écrans :
+- 💻 Desktop (1920px+)
+- 📱 Tablette (768px - 1919px)
+- 📱 Mobile (< 768px)
+
+## 🧪 Tests
+
+```bash
+# Lancer les tests (à implémenter)
+npm test
+
+# Coverage
+npm run test:coverage
+```
 
 ## 🚀 Déploiement
 
-### Variables d'environnement requises :
+### Recommandé: Vercel
 
-```bash
-VITE_SUPABASE_URL=https://votre-projet.supabase.co
-VITE_SUPABASE_ANON_KEY=votre-cle-anon
-```
+1. Push sur GitHub
+2. Importer dans Vercel
+3. Ajouter les variables d'environnement :
+   - `VITE_SUPABASE_URL`
+   - `VITE_SUPABASE_ANON_KEY`
+4. Déployer
 
-### Hébergement recommandé :
+### Alternatives
 
-- **Frontend** : Vercel, Netlify, ou Cloudflare Pages
-- **Base de données** : Supabase (déjà configuré)
-
-```bash
-# Build pour production
-npm run build
-
-# Preview du build
-npm run preview
-```
-
-## 🧪 Comptes de test
-
-Après avoir exécuté le schema SQL et créé les utilisateurs, vous pouvez tester avec :
-
-- **Admin** : `admin@medicab.tn` / `admin123`
-- **Médecin** : `dr.ben.ali@medicab.tn` / `doctor123`
-- **Secrétaire** : `fatma.sec@medicab.tn` / `secretary123`
-
-> **Note** : Vous devez créer ces utilisateurs dans Supabase. Voir [CONFIGURATION_RAPIDE.md](./CONFIGURATION_RAPIDE.md)
+- **Netlify** - Configuration similaire à Vercel
+- **Cloudflare Pages** - Build Vite supporté
+- **Firebase Hosting** - Build puis deploy
 
 ## 🤝 Contribution
 
-Ce projet est une application complète de gestion de cabinet médical. Pour contribuer :
-
 1. Fork le projet
-2. Créer une branche (`git checkout -b feature/AmazingFeature`)
-3. Commit les changements (`git commit -m 'Add AmazingFeature'`)
-4. Push vers la branche (`git push origin feature/AmazingFeature`)
+2. Créer une branche feature (`git checkout -b feature/AmazingFeature`)
+3. Commit vos changements (`git commit -m 'Add AmazingFeature'`)
+4. Push sur la branche (`git push origin feature/AmazingFeature`)
 5. Ouvrir une Pull Request
 
-## 📝 License
+## 📝 Licence
 
 Ce projet est sous licence MIT.
 
+## 👨‍💻 Auteur
+
+Développé avec ❤️ pour faciliter la gestion des cabinets médicaux.
+
 ## 🆘 Support
 
-### Problèmes courants :
+Des questions ? Consultez :
+1. [QUICK_START.md](./QUICK_START.md) - Démarrage rapide
+2. [SETUP_CHECKLIST.md](./SETUP_CHECKLIST.md) - Problèmes courants
+3. [Documentation Supabase](https://supabase.com/docs)
 
-#### ❌ "Variables Supabase manquantes"
-➡️ Voir [CONFIGURATION_RAPIDE.md](./CONFIGURATION_RAPIDE.md)
+## 🎉 Remerciements
 
-#### ❌ "Invalid API key"
-➡️ Vérifiez votre fichier `.env` et redémarrez le serveur
-
-#### ❌ "Permission denied"
-➡️ Vérifiez que le schema SQL a été exécuté correctement
-
-### Documentation :
-
-Consultez les fichiers de documentation dans le dossier racine pour plus d'informations.
-
-## ✨ Auteurs
-
-Développé avec ❤️ pour les professionnels de santé
+- **Supabase** - Backend incroyable
+- **React** - Framework UI moderne
+- **Tailwind CSS** - Styling rapide
+- **TypeScript** - Type safety
 
 ---
 
-**Version** : 2.0.0 (Supabase Edition)  
-**Dernière mise à jour** : Décembre 2025
-
-**🎉 Prêt à démarrer ? → [CONFIGURATION_RAPIDE.md](./CONFIGURATION_RAPIDE.md)**
+**MEDICAB - La gestion de cabinet médical simplifiée** 🏥✨

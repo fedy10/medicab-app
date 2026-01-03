@@ -54,7 +54,7 @@ export function MedecinDashboard({ user, profile, onLogout }: MedecinDashboardPr
               </div>
               <div>
                 <h1 className="text-gray-900">MediCare Pro</h1>
-                <p className="text-sm text-gray-500">Dr. {profile.nom} {profile.prenom}</p>
+                <p className="text-sm text-gray-500">{profile.name}</p>
               </div>
             </div>
 
@@ -199,7 +199,7 @@ export function MedecinDashboard({ user, profile, onLogout }: MedecinDashboardPr
         <div className="fixed bottom-6 right-6 z-[100]">
           <DoctorSecretaryChat 
             userId={profile.id} 
-            userName={`Dr. ${profile.nom} ${profile.prenom}`}
+            userName={profile.name}
           />
         </div>
       )}
@@ -208,7 +208,7 @@ export function MedecinDashboard({ user, profile, onLogout }: MedecinDashboardPr
         <div className="fixed bottom-6 right-[420px] z-[100]">
           <DoctorAdminChat 
             userId={profile.id} 
-            userName={`Dr. ${profile.nom} ${profile.prenom}`}
+            userName={profile.name}
           />
         </div>
       )}
@@ -216,7 +216,7 @@ export function MedecinDashboard({ user, profile, onLogout }: MedecinDashboardPr
       {/* Profile Modal */}
       {showProfileModal && (
         <ProfileModal
-          user={profile}
+          profile={profile}
           isOpen={showProfileModal}
           onClose={() => setShowProfileModal(false)}
         />

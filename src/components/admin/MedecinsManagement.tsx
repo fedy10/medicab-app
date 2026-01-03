@@ -2,13 +2,14 @@ import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Check, X, Phone, MapPin, Mail, AlertCircle, UserCheck, Clock, Search, ChevronLeft, ChevronRight, Filter, DollarSign, AlertTriangle } from 'lucide-react';
 import { MedecinDetailsModal } from '../modals/MedecinDetailsModal';
+import { useProfiles } from '../../hooks/useSupabase';
+import { profileService, revenueService } from '../../lib/services/supabaseService';
 
 interface MedecinsManagementProps {
   onUpdate?: () => void;
 }
 
 export function MedecinsManagement({ onUpdate }: MedecinsManagementProps) {
-  const [medecins, setMedecins] = useState<any[]>([]);
   const [selectedMedecin, setSelectedMedecin] = useState<any>(null);
   const [processing, setProcessing] = useState(false);
   const [activeTab, setActiveTab] = useState<'all' | 'pending'>('all');
@@ -20,361 +21,294 @@ export function MedecinsManagement({ onUpdate }: MedecinsManagementProps) {
   // Search and filters
   const [searchQuery, setSearchQuery] = useState('');
   const [paymentFilter, setPaymentFilter] = useState<'all' | 'paid' | 'late'>('all');
-
-  useEffect(() => {
-    fetchMedecins();
-  }, []);
+  
+  // Utiliser le hook Supabase
+  const { doctors: medecins, loading, refresh, updateStatus: updateProfileStatus } = useProfiles();
 
   // Reset to page 1 when filters change
   useEffect(() => {
     setCurrentPage(1);
   }, [searchQuery, paymentFilter, activeTab]);
 
-  const fetchMedecins = () => {
-    try {
-      const usersData = localStorage.getItem('demo_users');
-      const users = usersData ? JSON.parse(usersData) : [];
-      const medecinsData = users.filter((u: any) => u.role === 'medecin');
-      setMedecins(medecinsData);
-    } catch (error) {
-      console.error('Error fetching medecins:', error);
-      setMedecins([]);
-    }
-  };
-
-  const updateStatus = (userId: string, newStatus: string) => {
+  const updateStatus = async (userId: string, newStatus: 'active' | 'suspended') => {
     try {
       setProcessing(true);
-      const usersData = localStorage.getItem('demo_users');
-      const users = usersData ? JSON.parse(usersData) : [];
+      console.log('🔄 Mise à jour du statut:', userId, newStatus);
       
-      const updatedUsers = users.map((u: any) => 
-        u.id === userId ? { ...u, status: newStatus } : u
-      );
+      await updateProfileStatus(userId, newStatus);
       
-      localStorage.setItem('demo_users', JSON.stringify(updatedUsers));
-      fetchMedecins();
+      console.log('✅ Statut mis à jour avec succès');
       setSelectedMedecin(null);
       
       if (onUpdate) {
         onUpdate();
       }
-    } catch (error) {
-      console.error('Error updating status:', error);
+    } catch (error: any) {
+      console.error('❌ Erreur mise à jour statut:', error);
+      alert('Erreur lors de la mise à jour du statut: ' + error.message);
     } finally {
       setProcessing(false);
     }
   };
 
   // Check if doctor has paid recently (within last 30 days)
-  const hasRecentPayment = (medecinId: string): boolean => {
+  const hasRecentPayment = async (medecinId: string): Promise<boolean> => {
     try {
-      const key = `payments_${medecinId}`;
-      const stored = localStorage.getItem(key);
-      if (!stored) return false;
+      const thirtyDaysAgo = new Date();
+      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
       
-      const payments = JSON.parse(stored);
-      if (payments.length === 0) return false;
-      
-      // Get the most recent payment
-      const sortedPayments = [...payments].sort((a, b) => 
-        new Date(b.date).getTime() - new Date(a.date).getTime()
+      const stats = await revenueService.getStats(
+        medecinId,
+        thirtyDaysAgo.toISOString().split('T')[0]
       );
       
-      const lastPayment = sortedPayments[0];
-      const paymentDate = new Date(lastPayment.date);
-      const durationInDays = lastPayment.duration * 30; // Convert months to days
-      const expirationDate = new Date(paymentDate);
-      expirationDate.setDate(expirationDate.getDate() + durationInDays);
-      
-      const today = new Date();
-      return expirationDate >= today;
+      return stats.count > 0;
     } catch (error) {
+      console.error('Erreur vérification paiement:', error);
       return false;
     }
   };
 
-  const getPaymentStatus = (medecinId: string): 'paid' | 'late' | 'none' => {
+  // Get payment status
+  const getPaymentStatus = async (medecinId: string): Promise<'none' | 'paid' | 'late'> => {
     try {
-      const key = `payments_${medecinId}`;
-      const stored = localStorage.getItem(key);
-      if (!stored) return 'none';
+      const hasPayment = await hasRecentPayment(medecinId);
+      if (!hasPayment) return 'none';
       
-      const payments = JSON.parse(stored);
-      if (payments.length === 0) return 'none';
+      const stats = await revenueService.getStats(medecinId);
       
-      return hasRecentPayment(medecinId) ? 'paid' : 'late';
+      if (stats.revenues.length === 0) return 'none';
+      
+      // Get the most recent payment date
+      const sortedPayments = [...stats.revenues].sort((a, b) => 
+        new Date(b.date).getTime() - new Date(a.date).getTime()
+      );
+      
+      const lastPaymentDate = new Date(sortedPayments[0].date);
+      const thirtyDaysAgo = new Date();
+      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+      
+      if (lastPaymentDate < thirtyDaysAgo) {
+        return 'late';
+      }
+      
+      return 'paid';
     } catch (error) {
+      console.error('Erreur statut paiement:', error);
       return 'none';
     }
   };
 
-  const getStatusBadge = (status: string) => {
-    const styles = {
-      active: 'bg-green-100 text-green-700',
-      pending: 'bg-yellow-100 text-yellow-700',
-      suspended: 'bg-red-100 text-red-700',
-    };
-
-    const labels = {
-      active: 'Actif',
-      pending: 'En attente',
-      suspended: 'Suspendu',
-    };
-
-    return (
-      <span className={`px-3 py-1 rounded-full text-sm ${styles[status as keyof typeof styles] || 'bg-gray-100 text-gray-700'}`}>
-        {labels[status as keyof typeof labels] || status}
-      </span>
-    );
-  };
-
-  const getPaymentBadge = (medecinId: string) => {
-    const status = getPaymentStatus(medecinId);
+  // Filter medecins
+  const filteredMedecins = medecins.filter((m) => {
+    // Tab filter
+    if (activeTab === 'pending' && m.status !== 'pending') return false;
+    if (activeTab === 'all' && m.status === 'pending') return false;
     
-    if (status === 'paid') {
-      return (
-        <div className="flex items-center gap-1 px-2 py-1 bg-green-100 text-green-700 rounded-lg text-xs">
-          <DollarSign className="w-3 h-3" />
-          <span>Payé</span>
-        </div>
-      );
-    } else if (status === 'late') {
-      return (
-        <div className="flex items-center gap-1 px-2 py-1 bg-red-100 text-red-700 rounded-lg text-xs">
-          <AlertTriangle className="w-3 h-3" />
-          <span>En retard</span>
-        </div>
-      );
+    // Search filter
+    if (searchQuery) {
+      const query = searchQuery.toLowerCase();
+      const matchesName = m.name?.toLowerCase().includes(query);
+      const matchesEmail = m.email?.toLowerCase().includes(query);
+      const matchesSpecialty = m.specialty?.toLowerCase().includes(query);
+      
+      if (!matchesName && !matchesEmail && !matchesSpecialty) return false;
     }
-    return null;
-  };
+    
+    return true;
+  });
 
-  // Filter medecins based on tab
-  let filteredMedecins = activeTab === 'pending' 
-    ? medecins.filter(m => m.status === 'pending')
-    : medecins;
-
-  // Apply search filter
-  if (searchQuery.trim()) {
-    const query = searchQuery.toLowerCase().trim();
-    filteredMedecins = filteredMedecins.filter(m => 
-      m.nom?.toLowerCase().includes(query) ||
-      m.prenom?.toLowerCase().includes(query) ||
-      m.telephone?.toLowerCase().includes(query) ||
-      m.email?.toLowerCase().includes(query) ||
-      m.specialite?.toLowerCase().includes(query)
-    );
-  }
-
-  // Apply payment filter
-  if (paymentFilter !== 'all') {
-    filteredMedecins = filteredMedecins.filter(m => {
-      const status = getPaymentStatus(m.id);
-      if (paymentFilter === 'paid') {
-        return status === 'paid';
-      } else if (paymentFilter === 'late') {
-        return status === 'late' || status === 'none';
-      }
-      return true;
-    });
-  }
-
-  // Calculate pagination
+  // Pagination
   const totalPages = Math.ceil(filteredMedecins.length / itemsPerPage);
   const startIndex = (currentPage - 1) * itemsPerPage;
-  const endIndex = startIndex + itemsPerPage;
-  const currentMedecins = filteredMedecins.slice(startIndex, endIndex);
+  const paginatedMedecins = filteredMedecins.slice(startIndex, startIndex + itemsPerPage);
 
-  const pendingCount = medecins.filter(m => m.status === 'pending').length;
-  const paidCount = medecins.filter(m => getPaymentStatus(m.id) === 'paid').length;
-  const lateCount = medecins.filter(m => {
-    const status = getPaymentStatus(m.id);
-    return status === 'late' || status === 'none';
-  }).length;
+  const getStatusBadge = (status: string) => {
+    switch (status) {
+      case 'active':
+        return (
+          <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-green-100 text-green-700 text-xs">
+            <UserCheck className="w-3 h-3" />
+            Actif
+          </span>
+        );
+      case 'pending':
+        return (
+          <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-orange-100 text-orange-700 text-xs">
+            <Clock className="w-3 h-3" />
+            En attente
+          </span>
+        );
+      case 'suspended':
+        return (
+          <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-red-100 text-red-700 text-xs">
+            <AlertCircle className="w-3 h-3" />
+            Suspendu
+          </span>
+        );
+      default:
+        return null;
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="text-center py-12">
+        <div className="w-16 h-16 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+        <p className="text-gray-600">Chargement des médecins...</p>
+      </div>
+    );
+  }
 
   return (
-    <div className="space-y-6">
-      {/* Tabs */}
-      <div className="flex gap-4 border-b border-gray-200">
-        <button
-          onClick={() => setActiveTab('all')}
-          className={`px-4 py-3 flex items-center gap-2 transition-colors relative ${
-            activeTab === 'all'
-              ? 'text-blue-600'
-              : 'text-gray-600 hover:text-gray-900'
-          }`}
-        >
-          <UserCheck className="w-4 h-4" />
-          Tous les médecins
-          {activeTab === 'all' && (
-            <motion.div
-              layoutId="activeTab"
-              className="absolute bottom-0 left-0 right-0 h-0.5 bg-blue-600"
-            />
-          )}
-        </button>
-        <button
-          onClick={() => setActiveTab('pending')}
-          className={`px-4 py-3 flex items-center gap-2 transition-colors relative ${
-            activeTab === 'pending'
-              ? 'text-blue-600'
-              : 'text-gray-600 hover:text-gray-900'
-          }`}
-        >
-          <Clock className="w-4 h-4" />
-          Demandes en attente
-          {pendingCount > 0 && (
-            <span className="px-2 py-0.5 bg-yellow-100 text-yellow-700 text-xs rounded-full">
-              {pendingCount}
-            </span>
-          )}
-          {activeTab === 'pending' && (
-            <motion.div
-              layoutId="activeTab"
-              className="absolute bottom-0 left-0 right-0 h-0.5 bg-blue-600"
-            />
-          )}
-        </button>
+    <div>
+      {/* Header with Tabs */}
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
+        <div>
+          <h2 className="text-gray-900 mb-2">Gestion des Médecins</h2>
+          <p className="text-gray-600">
+            {filteredMedecins.length} médecin{filteredMedecins.length > 1 ? 's' : ''}
+          </p>
+        </div>
+
+        {/* Tabs */}
+        <div className="flex gap-2">
+          <button
+            onClick={() => setActiveTab('all')}
+            className={`px-4 py-2 rounded-lg font-medium transition-all ${
+              activeTab === 'all'
+                ? 'bg-blue-500 text-white shadow-lg'
+                : 'bg-white text-gray-600 hover:bg-gray-100'
+            }`}
+          >
+            Tous ({medecins.filter(m => m.status !== 'pending').length})
+          </button>
+          <button
+            onClick={() => setActiveTab('pending')}
+            className={`px-4 py-2 rounded-lg font-medium transition-all ${
+              activeTab === 'pending'
+                ? 'bg-orange-500 text-white shadow-lg'
+                : 'bg-white text-gray-600 hover:bg-gray-100'
+            }`}
+          >
+            En attente ({medecins.filter(m => m.status === 'pending').length})
+          </button>
+        </div>
       </div>
 
       {/* Search and Filters */}
-      <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
-        <div className="flex flex-col md:flex-row gap-4">
-          {/* Search Bar */}
-          <div className="flex-1 relative">
-            <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Rechercher par nom, téléphone, email..."
-              className="w-full pl-12 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition-all"
-            />
-          </div>
-
-          {/* Payment Filter */}
-          <div className="flex gap-2">
-            <button
-              onClick={() => setPaymentFilter('all')}
-              className={`flex items-center gap-2 px-4 py-3 rounded-xl transition-all ${
-                paymentFilter === 'all'
-                  ? 'bg-gradient-to-r from-blue-500 to-purple-600 text-white shadow-lg'
-                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-              }`}
-            >
-              <Filter className="w-4 h-4" />
-              <span>Tous</span>
-              <span className={`px-2 py-0.5 rounded-full text-xs ${
-                paymentFilter === 'all' ? 'bg-white/20' : 'bg-gray-200'
-              }`}>
-                {medecins.length}
-              </span>
-            </button>
-
-            <button
-              onClick={() => setPaymentFilter('paid')}
-              className={`flex items-center gap-2 px-4 py-3 rounded-xl transition-all ${
-                paymentFilter === 'paid'
-                  ? 'bg-gradient-to-r from-green-500 to-emerald-600 text-white shadow-lg'
-                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-              }`}
-            >
-              <DollarSign className="w-4 h-4" />
-              <span>Payé</span>
-              <span className={`px-2 py-0.5 rounded-full text-xs ${
-                paymentFilter === 'paid' ? 'bg-white/20' : 'bg-green-100 text-green-700'
-              }`}>
-                {paidCount}
-              </span>
-            </button>
-
-            <button
-              onClick={() => setPaymentFilter('late')}
-              className={`flex items-center gap-2 px-4 py-3 rounded-xl transition-all ${
-                paymentFilter === 'late'
-                  ? 'bg-gradient-to-r from-red-500 to-rose-600 text-white shadow-lg'
-                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-              }`}
-            >
-              <AlertTriangle className="w-4 h-4" />
-              <span>En retard</span>
-              <span className={`px-2 py-0.5 rounded-full text-xs ${
-                paymentFilter === 'late' ? 'bg-white/20' : 'bg-red-100 text-red-700'
-              }`}>
-                {lateCount}
-              </span>
-            </button>
-          </div>
-        </div>
-
-        {/* Results count */}
-        <div className="mt-4 text-sm text-gray-600">
-          {filteredMedecins.length === 0 ? (
-            <span>Aucun résultat trouvé</span>
-          ) : (
-            <span>
-              {filteredMedecins.length} médecin{filteredMedecins.length > 1 ? 's' : ''} trouvé{filteredMedecins.length > 1 ? 's' : ''}
-              {searchQuery && <span> pour "{searchQuery}"</span>}
-            </span>
-          )}
+      <div className="mb-6 flex flex-col sm:flex-row gap-4">
+        {/* Search */}
+        <div className="flex-1 relative">
+          <Search className="w-5 h-5 text-gray-400 absolute left-3 top-1/2 transform -translate-y-1/2" />
+          <input
+            type="text"
+            placeholder="Rechercher par nom, email ou spécialité..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          />
         </div>
       </div>
 
-      {/* Medecins List */}
-      {currentMedecins.length > 0 ? (
+      {/* Medecins Grid */}
+      {paginatedMedecins.length === 0 ? (
+        <div className="text-center py-12 bg-white rounded-lg shadow">
+          <AlertCircle className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+          <p className="text-gray-600">Aucun médecin trouvé</p>
+        </div>
+      ) : (
         <>
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {currentMedecins.map((medecin, index) => (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {paginatedMedecins.map((medecin) => (
               <motion.div
                 key={medecin.id}
-                initial={{ opacity: 0, scale: 0.95 }}
-                animate={{ opacity: 1, scale: 1 }}
-                transition={{ delay: index * 0.05 }}
-                className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 hover:shadow-md transition-all cursor-pointer"
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="bg-white rounded-xl shadow-lg p-6 hover:shadow-xl transition-all cursor-pointer"
                 onClick={() => setSelectedMedecin(medecin)}
               >
-                <div className="flex items-start gap-4">
-                  <div className="w-16 h-16 bg-gradient-to-br from-blue-500 to-purple-600 rounded-2xl flex items-center justify-center text-white flex-shrink-0">
-                    <span className="text-xl">
-                      {medecin.nom?.[0]}{medecin.prenom?.[0]}
-                    </span>
+                <div className="flex items-start justify-between mb-4">
+                  <div>
+                    <h3 className="text-gray-900 mb-1">{medecin.name}</h3>
+                    <p className="text-sm text-gray-500">{medecin.specialty || 'Médecin généraliste'}</p>
                   </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-start justify-between gap-2 mb-2">
-                      <h3 className="text-gray-900 truncate">
-                        Dr. {medecin.nom} {medecin.prenom}
-                      </h3>
-                      <div className="flex flex-col gap-1 items-end">
-                        {getStatusBadge(medecin.status)}
-                        {getPaymentBadge(medecin.id)}
-                      </div>
-                    </div>
-                    <p className="text-gray-600 text-sm mb-3">{medecin.specialite}</p>
-                    
-                    <div className="space-y-2 text-sm">
-                      <div className="flex items-center gap-2 text-gray-600">
-                        <Phone className="w-4 h-4" />
-                        <span>{medecin.telephone}</span>
-                      </div>
-                      <div className="flex items-center gap-2 text-gray-600">
-                        <Mail className="w-4 h-4" />
-                        <span className="truncate">{medecin.email}</span>
-                      </div>
-                      {medecin.adresse && (
-                        <div className="flex items-center gap-2 text-gray-600">
-                          <MapPin className="w-4 h-4" />
-                          <span className="truncate">{medecin.adresse}</span>
-                        </div>
-                      )}
-                    </div>
+                  {getStatusBadge(medecin.status)}
+                </div>
 
-                    {medecin.code_medecin && (
-                      <div className="mt-3 px-3 py-2 bg-blue-50 rounded-lg">
-                        <p className="text-sm text-blue-700">Code: {medecin.code_medecin}</p>
-                      </div>
-                    )}
+                <div className="space-y-2 text-sm text-gray-600">
+                  <div className="flex items-center gap-2">
+                    <Mail className="w-4 h-4" />
+                    <span>{medecin.email}</span>
                   </div>
+                  {medecin.phone && (
+                    <div className="flex items-center gap-2">
+                      <Phone className="w-4 h-4" />
+                      <span>{medecin.phone}</span>
+                    </div>
+                  )}
+                  {medecin.address && (
+                    <div className="flex items-center gap-2">
+                      <MapPin className="w-4 h-4" />
+                      <span className="truncate">{medecin.address}</span>
+                    </div>
+                  )}
+                </div>
+
+                {/* Actions */}
+                <div className="mt-4 pt-4 border-t border-gray-200 flex gap-2">
+                  {medecin.status === 'pending' && (
+                    <>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          updateStatus(medecin.id, 'active');
+                        }}
+                        disabled={processing}
+                        className="flex-1 flex items-center justify-center gap-2 px-3 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-all disabled:opacity-50"
+                      >
+                        <Check className="w-4 h-4" />
+                        Approuver
+                      </button>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          updateStatus(medecin.id, 'suspended');
+                        }}
+                        disabled={processing}
+                        className="flex-1 flex items-center justify-center gap-2 px-3 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-all disabled:opacity-50"
+                      >
+                        <X className="w-4 h-4" />
+                        Rejeter
+                      </button>
+                    </>
+                  )}
+                  {medecin.status === 'active' && (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        updateStatus(medecin.id, 'suspended');
+                      }}
+                      disabled={processing}
+                      className="flex-1 flex items-center justify-center gap-2 px-3 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-all disabled:opacity-50"
+                    >
+                      <X className="w-4 h-4" />
+                      Suspendre
+                    </button>
+                  )}
+                  {medecin.status === 'suspended' && (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        updateStatus(medecin.id, 'active');
+                      }}
+                      disabled={processing}
+                      className="flex-1 flex items-center justify-center gap-2 px-3 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-all disabled:opacity-50"
+                    >
+                      <Check className="w-4 h-4" />
+                      Réactiver
+                    </button>
+                  )}
                 </div>
               </motion.div>
             ))}
@@ -382,106 +316,39 @@ export function MedecinsManagement({ onUpdate }: MedecinsManagementProps) {
 
           {/* Pagination */}
           {totalPages > 1 && (
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="flex items-center justify-center gap-2"
-            >
+            <div className="mt-6 flex items-center justify-center gap-2">
               <button
                 onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
                 disabled={currentPage === 1}
-                className={`p-2 rounded-lg transition-all ${
-                  currentPage === 1
-                    ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                    : 'bg-white text-gray-700 hover:bg-gray-50 shadow-sm border border-gray-200'
-                }`}
+                className="p-2 rounded-lg bg-white border border-gray-300 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <ChevronLeft className="w-5 h-5" />
               </button>
-
-              <div className="flex items-center gap-2">
-                {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => {
-                  // Show first, last, current, and adjacent pages
-                  if (
-                    page === 1 ||
-                    page === totalPages ||
-                    (page >= currentPage - 1 && page <= currentPage + 1)
-                  ) {
-                    return (
-                      <button
-                        key={page}
-                        onClick={() => setCurrentPage(page)}
-                        className={`w-10 h-10 rounded-lg transition-all ${
-                          currentPage === page
-                            ? 'bg-gradient-to-r from-blue-500 to-purple-600 text-white shadow-lg'
-                            : 'bg-white text-gray-700 hover:bg-gray-50 shadow-sm border border-gray-200'
-                        }`}
-                      >
-                        {page}
-                      </button>
-                    );
-                  } else if (page === currentPage - 2 || page === currentPage + 2) {
-                    return (
-                      <span key={page} className="text-gray-400">
-                        ...
-                      </span>
-                    );
-                  }
-                  return null;
-                })}
-              </div>
-
+              
+              <span className="px-4 py-2 text-sm text-gray-600">
+                Page {currentPage} sur {totalPages}
+              </span>
+              
               <button
                 onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
                 disabled={currentPage === totalPages}
-                className={`p-2 rounded-lg transition-all ${
-                  currentPage === totalPages
-                    ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                    : 'bg-white text-gray-700 hover:bg-gray-50 shadow-sm border border-gray-200'
-                }`}
+                className="p-2 rounded-lg bg-white border border-gray-300 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <ChevronRight className="w-5 h-5" />
               </button>
-            </motion.div>
+            </div>
           )}
         </>
-      ) : (
-        <div className="bg-white rounded-2xl p-12 text-center shadow-sm border border-gray-100">
-          <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
-            <AlertCircle className="w-8 h-8 text-gray-400" />
-          </div>
-          <p className="text-gray-600">
-            {searchQuery || paymentFilter !== 'all'
-              ? 'Aucun médecin ne correspond à vos critères de recherche'
-              : activeTab === 'pending' 
-                ? 'Aucune demande en attente' 
-                : 'Aucun médecin enregistré'}
-          </p>
-          {(searchQuery || paymentFilter !== 'all') && (
-            <button
-              onClick={() => {
-                setSearchQuery('');
-                setPaymentFilter('all');
-              }}
-              className="mt-4 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
-            >
-              Réinitialiser les filtres
-            </button>
-          )}
-        </div>
       )}
 
-      {/* Medecin Detail Modal */}
-      <AnimatePresence>
-        {selectedMedecin && (
-          <MedecinDetailsModal
-            medecin={selectedMedecin}
-            onClose={() => setSelectedMedecin(null)}
-            onUpdateStatus={updateStatus}
-            processing={processing}
-          />
-        )}
-      </AnimatePresence>
+      {/* Details Modal */}
+      {selectedMedecin && (
+        <MedecinDetailsModal
+          medecin={selectedMedecin}
+          onClose={() => setSelectedMedecin(null)}
+          onStatusUpdate={(id, status) => updateStatus(id, status)}
+        />
+      )}
     </div>
   );
 }

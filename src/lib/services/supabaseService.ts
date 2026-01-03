@@ -13,7 +13,6 @@ type ChatMessage = Database['public']['Tables']['chat_messages']['Row'];
 type ReferralLetter = Database['public']['Tables']['referral_letters']['Row'];
 type Notification = Database['public']['Tables']['notifications']['Row'];
 type Revenue = Database['public']['Tables']['revenues']['Row'];
-type MedicalFile = Database['public']['Tables']['medical_files']['Row'];
 
 export interface ChronicDisease {
   id: string;
@@ -38,29 +37,15 @@ export const authService = {
   // Connexion
   async login(email: string, password: string) {
     try {
-      console.log('🔑 Étape 1 : Appel signInWithPassword...');
+      console.log('🔑 Connexion Supabase...', email);
       
-      // Timeout de sécurité : si la promesse ne se résout pas en 10 secondes, on force une erreur
-      const loginPromise = supabase.auth.signInWithPassword({
+      const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password,
       });
 
-      const timeoutPromise = new Promise((_, reject) => {
-        setTimeout(() => reject(new Error('Timeout: La connexion a pris trop de temps')), 10000);
-      });
-
-      const { data, error } = await Promise.race([loginPromise, timeoutPromise]) as any;
-
-      console.log('📦 Étape 2 : Réponse reçue', { 
-        hasData: !!data, 
-        hasError: !!error,
-        hasUser: !!data?.user 
-      });
-
       if (error) {
         console.error('❌ Erreur Supabase:', error);
-        // Messages d'erreur traduits
         if (error.message.includes('Invalid login credentials')) {
           return { success: false, error: 'Email ou mot de passe incorrect' };
         } else if (error.message.includes('Email not confirmed')) {
@@ -75,8 +60,6 @@ export const authService = {
         return { success: false, error: 'Utilisateur non trouvé' };
       }
 
-      console.log('✅ Étape 3 : Utilisateur trouvé', data.user.email);
-
       // Vérifier si l'email est confirmé
       if (!data.user.email_confirmed_at) {
         console.warn('⚠️ Email non confirmé');
@@ -87,8 +70,7 @@ export const authService = {
         };
       }
 
-      console.log('✅ Étape 4 : Email confirmé');
-      console.log('🔍 Étape 5 : Récupération du profil pour ID:', data.user.id);
+      console.log('🔍 Récupération du profil...');
 
       // Récupérer le profil
       const { data: profile, error: profileError } = await supabase
@@ -97,70 +79,36 @@ export const authService = {
         .eq('id', data.user.id)
         .single();
 
-      console.log('📊 Étape 6 : Profil récupéré', { 
-        hasProfile: !!profile, 
-        hasError: !!profileError,
-        profile: profile
-      });
-
       if (profileError) {
-        console.error('❌ Erreur lors de la récupération du profil:', profileError);
-        
-        // Si le profil n'existe pas, on le crée
-        if (profileError.code === 'PGRST116') {
-          console.log('⚠️ Profil inexistant, création automatique...');
-          
-          const { data: newProfile, error: createError } = await supabase
-            .from('profiles')
-            .insert({
-              id: data.user.id,
-              email: data.user.email!,
-              name: data.user.user_metadata?.name || 'Utilisateur',
-              role: data.user.user_metadata?.role || 'doctor',
-              status: 'active',
-            })
-            .select()
-            .single();
-          
-          if (createError) {
-            console.error('❌ Impossible de créer le profil:', createError);
-            return { success: false, error: 'Profil non trouvé. Contactez l\'administrateur.' };
-          }
-          
-          console.log('✅ Profil créé automatiquement:', newProfile);
-          return { success: true, user: data.user, profile: newProfile };
-        }
-        
-        return { success: false, error: 'Profil non trouvé. Contactez l\'administrateur.' };
-      }
-
-      if (!profile) {
-        console.error('❌ Profil vide');
-        return { success: false, error: 'Profil non trouvé. Contactez l\'administrateur.' };
+        console.error('❌ Erreur récupération profil:', profileError);
+        return { success: false, error: 'Profil introuvable' };
       }
 
       // Vérifier si le compte est suspendu
       if (profile.status === 'suspended') {
         console.warn('⚠️ Compte suspendu');
         await supabase.auth.signOut();
-        return { success: false, error: 'Votre compte a été suspendu. Contactez l\'administrateur.' };
+        return { 
+          success: false, 
+          error: '⚠️ Votre compte a été suspendu. Contactez l\'administrateur.' 
+        };
       }
 
-      console.log('✅ Étape 7 : Connexion réussie !', {
-        user: data.user.email,
-        role: profile.role,
-        status: profile.status
-      });
-
-      return { success: true, user: data.user, profile };
+      console.log('✅ Connexion réussie !');
+      
+      return {
+        success: true,
+        user: data.user,
+        profile: profile,
+      };
     } catch (error: any) {
-      console.error('💥 Exception dans login():', error);
-      return { success: false, error: 'Erreur de connexion. Vérifiez votre configuration Supabase.' };
+      console.error('💥 Exception login:', error);
+      return { success: false, error: error.message || 'Erreur de connexion' };
     }
   },
 
   // Inscription
-  async register(data: {
+  async register(userData: {
     email: string;
     password: string;
     name: string;
@@ -170,55 +118,80 @@ export const authService = {
     specialty?: string;
     assignedDoctorId?: string;
   }) {
-    const { data: authData, error: authError } = await supabase.auth.signUp({
-      email: data.email,
-      password: data.password,
-      options: {
-        data: {
-          name: data.name,
-          role: data.role,
+    try {
+      console.log('📝 Inscription...', userData.email);
+
+      // Créer l'utilisateur dans auth
+      const { data, error } = await supabase.auth.signUp({
+        email: userData.email,
+        password: userData.password,
+        options: {
+          data: {
+            name: userData.name,
+            role: userData.role,
+          },
         },
-      },
-    });
+      });
 
-    if (authError) {
-      return { success: false, error: authError.message };
+      if (error) {
+        console.error('❌ Erreur inscription:', error);
+        return { success: false, error: error.message };
+      }
+
+      if (!data.user) {
+        return { success: false, error: 'Utilisateur non créé' };
+      }
+
+      // Mettre à jour le profil avec les infos complètes
+      const { data: profile, error: profileError } = await supabase
+        .from('profiles')
+        .update({
+          name: userData.name,
+          role: userData.role,
+          phone: userData.phone || null,
+          address: userData.address || null,
+          specialty: userData.specialty || null,
+          assigned_doctor_id: userData.assignedDoctorId || null,
+          status: userData.role === 'doctor' ? 'suspended' : 'active', // Médecins en attente de validation
+        })
+        .eq('id', data.user.id)
+        .select()
+        .single();
+
+      if (profileError) {
+        console.error('❌ Erreur mise à jour profil:', profileError);
+        return { success: false, error: 'Erreur création profil' };
+      }
+
+      console.log('✅ Inscription réussie');
+
+      return {
+        success: true,
+        user: data.user,
+        profile: profile,
+      };
+    } catch (error: any) {
+      console.error('💥 Exception inscription:', error);
+      return { success: false, error: error.message || 'Erreur d\'inscription' };
     }
-
-    if (!authData.user) {
-      return { success: false, error: 'Erreur lors de la création du compte' };
-    }
-
-    // Mettre à jour le profil avec les informations supplémentaires
-    const { error: updateError } = await supabase
-      .from('profiles')
-      .update({
-        phone: data.phone,
-        address: data.address,
-        specialty: data.specialty,
-        status: data.role === 'doctor' ? 'suspended' : 'active',
-        assigned_doctor_id: data.assignedDoctorId,
-      })
-      .eq('id', authData.user.id);
-
-    if (updateError) {
-      console.error('Erreur lors de la mise à jour du profil:', updateError);
-    }
-
-    // Récupérer le profil complet
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('id', authData.user.id)
-      .single();
-
-    return { success: true, user: authData.user, profile };
   },
 
   // Déconnexion
   async logout() {
-    const { error } = await supabase.auth.signOut();
-    return { success: !error, error: error?.message };
+    try {
+      console.log('👋 Déconnexion...');
+      const { error } = await supabase.auth.signOut();
+      
+      if (error) {
+        console.error('❌ Erreur déconnexion:', error);
+        throw error;
+      }
+      
+      console.log('✅ Déconnexion réussie');
+    } catch (error) {
+      console.error('💥 Exception déconnexion:', error);
+      throw error;
+    }
   },
 
   // Récupérer la session actuelle
@@ -265,10 +238,12 @@ export const authService = {
     }
   },
 
-  // Récupérer l'utilisateur actuel
-  async getCurrentUser() {
-    const { data: { user } } = await supabase.auth.getUser();
-    return user;
+  // Écouter les changements d'authentification
+  onAuthStateChange(callback: (session: any) => void) {
+    return supabase.auth.onAuthStateChange((event, session) => {
+      console.log('🔄 Auth state changed:', event);
+      callback(session);
+    });
   },
 };
 
@@ -277,7 +252,7 @@ export const authService = {
 // ============================================
 
 export const profileService = {
-  // Récupérer tous les profils
+  // Récupérer tous les profils (admin)
   async getAll() {
     const { data, error } = await supabase
       .from('profiles')
@@ -300,25 +275,26 @@ export const profileService = {
     return data;
   },
 
-  // Récupérer un profil par email
-  async getByEmail(email: string) {
+  // Récupérer tous les médecins
+  async getAllDoctors() {
     const { data, error } = await supabase
       .from('profiles')
       .select('*')
-      .eq('email', email)
-      .single();
+      .eq('role', 'doctor')
+      .order('name', { ascending: true });
 
     if (error) throw error;
-    return data;
+    return data || [];
   },
 
-  // Récupérer les profils par rôle
-  async getByRole(role: 'admin' | 'doctor' | 'secretary') {
+  // Récupérer tous les médecins actifs
+  async getActiveDoctors() {
     const { data, error } = await supabase
       .from('profiles')
       .select('*')
-      .eq('role', role)
-      .order('created_at', { ascending: false });
+      .eq('role', 'doctor')
+      .eq('status', 'active')
+      .order('name', { ascending: true });
 
     if (error) throw error;
     return data || [];
@@ -330,14 +306,15 @@ export const profileService = {
       .from('profiles')
       .select('*')
       .eq('role', 'secretary')
-      .eq('assigned_doctor_id', doctorId);
+      .eq('assigned_doctor_id', doctorId)
+      .order('name', { ascending: true });
 
     if (error) throw error;
     return data || [];
   },
 
   // Mettre à jour un profil
-  async update(id: string, updates: Partial<Omit<Profile, 'id' | 'created_at' | 'updated_at'>>) {
+  async update(id: string, updates: Database['public']['Tables']['profiles']['Update']) {
     const { data, error } = await supabase
       .from('profiles')
       .update(updates)
@@ -349,12 +326,20 @@ export const profileService = {
     return data;
   },
 
-  // Suspendre/Activer un utilisateur
+  // Changer le statut d'un médecin (admin)
   async updateStatus(id: string, status: 'active' | 'suspended') {
-    return this.update(id, { status });
+    const { data, error } = await supabase
+      .from('profiles')
+      .update({ status })
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (error) throw error;
+    return data;
   },
 
-  // Supprimer un profil
+  // Supprimer un profil (admin)
   async delete(id: string) {
     const { error } = await supabase
       .from('profiles')
@@ -370,18 +355,14 @@ export const profileService = {
 // ============================================
 
 export const patientService = {
-  // Récupérer tous les patients (avec filtre optionnel par médecin)
-  async getAll(doctorId?: string) {
-    let query = supabase
+  // Récupérer tous les patients d'un médecin
+  async getByDoctor(doctorId: string) {
+    const { data, error } = await supabase
       .from('patients')
       .select('*')
+      .eq('doctor_id', doctorId)
       .order('created_at', { ascending: false });
 
-    if (doctorId) {
-      query = query.eq('doctor_id', doctorId);
-    }
-
-    const { data, error } = await query;
     if (error) throw error;
     return data || [];
   },
@@ -398,7 +379,7 @@ export const patientService = {
     return data;
   },
 
-  // Créer un nouveau patient
+  // Créer un patient
   async create(patient: Database['public']['Tables']['patients']['Insert']) {
     const { data, error } = await supabase
       .from('patients')
@@ -432,6 +413,38 @@ export const patientService = {
 
     if (error) throw error;
   },
+
+  // Rechercher des patients
+  async search(doctorId: string, query: string) {
+    const { data, error } = await supabase
+      .from('patients')
+      .select('*')
+      .eq('doctor_id', doctorId)
+      .ilike('name', `%${query}%`)
+      .order('name', { ascending: true });
+
+    if (error) throw error;
+    return data || [];
+  },
+
+  // Statistiques patients
+  async getStats(doctorId: string) {
+    const { data, error } = await supabase
+      .from('patients')
+      .select('*')
+      .eq('doctor_id', doctorId);
+
+    if (error) throw error;
+
+    const patients = data || [];
+    const total = patients.length;
+    const withDiseases = patients.filter((p) => {
+      const diseases = p.diseases as any[];
+      return diseases && diseases.length > 0;
+    }).length;
+
+    return { total, withDiseases };
+  },
 };
 
 // ============================================
@@ -439,19 +452,43 @@ export const patientService = {
 // ============================================
 
 export const appointmentService = {
-  // Récupérer tous les rendez-vous
-  async getAll(doctorId?: string) {
+  // Récupérer tous les rendez-vous d'un médecin
+  async getByDoctor(doctorId: string, filters?: {
+    startDate?: string;
+    endDate?: string;
+    status?: string;
+  }) {
     let query = supabase
       .from('appointments')
       .select('*')
+      .eq('doctor_id', doctorId)
       .order('date', { ascending: true })
       .order('time', { ascending: true });
 
-    if (doctorId) {
-      query = query.eq('doctor_id', doctorId);
+    if (filters?.startDate) {
+      query = query.gte('date', filters.startDate);
+    }
+    if (filters?.endDate) {
+      query = query.lte('date', filters.endDate);
+    }
+    if (filters?.status) {
+      query = query.eq('status', filters.status);
     }
 
     const { data, error } = await query;
+    if (error) throw error;
+    return data || [];
+  },
+
+  // Récupérer les rendez-vous d'un patient
+  async getByPatient(patientId: string) {
+    const { data, error } = await supabase
+      .from('appointments')
+      .select('*')
+      .eq('patient_id', patientId)
+      .order('date', { ascending: false })
+      .order('time', { ascending: false });
+
     if (error) throw error;
     return data || [];
   },
@@ -503,21 +540,74 @@ export const appointmentService = {
     if (error) throw error;
   },
 
-  // Récupérer les rendez-vous par date
-  async getByDate(date: string, doctorId?: string) {
+  // Marquer comme complété
+  async markAsCompleted(id: string) {
+    return this.update(id, { status: 'completed' });
+  },
+
+  // Annuler un rendez-vous
+  async cancel(id: string) {
+    return this.update(id, { status: 'cancelled' });
+  },
+
+  // Statistiques rendez-vous
+  async getStats(doctorId: string, startDate?: string, endDate?: string) {
     let query = supabase
       .from('appointments')
       .select('*')
-      .eq('date', date)
-      .order('time', { ascending: true });
+      .eq('doctor_id', doctorId);
 
-    if (doctorId) {
-      query = query.eq('doctor_id', doctorId);
+    if (startDate) {
+      query = query.gte('date', startDate);
+    }
+    if (endDate) {
+      query = query.lte('date', endDate);
     }
 
     const { data, error } = await query;
     if (error) throw error;
-    return data || [];
+
+    const appointments = data || [];
+    const total = appointments.length;
+    const scheduled = appointments.filter((a) => a.status === 'scheduled').length;
+    const completed = appointments.filter((a) => a.status === 'completed').length;
+    const cancelled = appointments.filter((a) => a.status === 'cancelled').length;
+
+    return { total, scheduled, completed, cancelled };
+  },
+
+  // Vérifier les conflits d'horaire
+  async checkConflict(doctorId: string, date: string, time: string, duration: number, excludeId?: string) {
+    let query = supabase
+      .from('appointments')
+      .select('*')
+      .eq('doctor_id', doctorId)
+      .eq('date', date)
+      .neq('status', 'cancelled');
+
+    if (excludeId) {
+      query = query.neq('id', excludeId);
+    }
+
+    const { data, error } = await query;
+    if (error) throw error;
+
+    // Vérifier les chevauchements d'horaire
+    const [hours, minutes] = time.split(':').map(Number);
+    const startMinutes = hours * 60 + minutes;
+    const endMinutes = startMinutes + duration;
+
+    return (data || []).some((apt) => {
+      const [aptHours, aptMinutes] = apt.time.split(':').map(Number);
+      const aptStart = aptHours * 60 + aptMinutes;
+      const aptEnd = aptStart + apt.duration;
+
+      return (
+        (startMinutes >= aptStart && startMinutes < aptEnd) ||
+        (endMinutes > aptStart && endMinutes <= aptEnd) ||
+        (startMinutes <= aptStart && endMinutes >= aptEnd)
+      );
+    });
   },
 };
 
@@ -526,19 +616,39 @@ export const appointmentService = {
 // ============================================
 
 export const consultationService = {
-  // Récupérer toutes les consultations
-  async getAll(doctorId?: string) {
+  // Récupérer toutes les consultations d'un médecin
+  async getByDoctor(doctorId: string, filters?: {
+    startDate?: string;
+    endDate?: string;
+  }) {
     let query = supabase
       .from('consultations')
       .select('*')
+      .eq('doctor_id', doctorId)
       .order('date', { ascending: false })
       .order('time', { ascending: false });
 
-    if (doctorId) {
-      query = query.eq('doctor_id', doctorId);
+    if (filters?.startDate) {
+      query = query.gte('date', filters.startDate);
+    }
+    if (filters?.endDate) {
+      query = query.lte('date', filters.endDate);
     }
 
     const { data, error } = await query;
+    if (error) throw error;
+    return data || [];
+  },
+
+  // Récupérer les consultations d'un patient
+  async getByPatient(patientId: string) {
+    const { data, error } = await supabase
+      .from('consultations')
+      .select('*')
+      .eq('patient_id', patientId)
+      .order('date', { ascending: false })
+      .order('time', { ascending: false });
+
     if (error) throw error;
     return data || [];
   },
@@ -590,16 +700,27 @@ export const consultationService = {
     if (error) throw error;
   },
 
-  // Récupérer les consultations d'un patient
-  async getByPatient(patientId: string) {
-    const { data, error } = await supabase
+  // Statistiques consultations
+  async getStats(doctorId: string, startDate?: string, endDate?: string) {
+    let query = supabase
       .from('consultations')
       .select('*')
-      .eq('patient_id', patientId)
-      .order('date', { ascending: false });
+      .eq('doctor_id', doctorId);
 
+    if (startDate) {
+      query = query.gte('date', startDate);
+    }
+    if (endDate) {
+      query = query.lte('date', endDate);
+    }
+
+    const { data, error } = await query;
     if (error) throw error;
-    return data || [];
+
+    const consultations = data || [];
+    const total = consultations.length;
+
+    return { total, consultations };
   },
 };
 
@@ -608,12 +729,26 @@ export const consultationService = {
 // ============================================
 
 export const chatService = {
-  // Récupérer les messages entre deux utilisateurs
-  async getMessages(userId1: string, userId2: string) {
+  // Récupérer les conversations d'un utilisateur
+  async getConversations(userId: string) {
     const { data, error } = await supabase
       .from('chat_messages')
       .select('*')
-      .or(`and(sender_id.eq.${userId1},recipient_id.eq.${userId2}),and(sender_id.eq.${userId2},recipient_id.eq.${userId1})`)
+      .or(`sender_id.eq.${userId},recipient_id.eq.${userId}`)
+      .order('timestamp', { ascending: false });
+
+    if (error) throw error;
+    return data || [];
+  },
+
+  // Récupérer les messages entre deux utilisateurs
+  async getMessages(userId: string, otherUserId: string) {
+    const { data, error } = await supabase
+      .from('chat_messages')
+      .select('*')
+      .or(
+        `and(sender_id.eq.${userId},recipient_id.eq.${otherUserId}),and(sender_id.eq.${otherUserId},recipient_id.eq.${userId})`
+      )
       .order('timestamp', { ascending: true });
 
     if (error) throw error;
@@ -632,21 +767,16 @@ export const chatService = {
     return data;
   },
 
-  // Modifier un message
-  async updateMessage(id: string, content: string) {
-    const { data, error } = await supabase
+  // Marquer les messages comme lus
+  async markAsRead(userId: string, otherUserId: string) {
+    const { error } = await supabase
       .from('chat_messages')
-      .update({
-        content,
-        edited: true,
-        edited_at: new Date().toISOString(),
-      })
-      .eq('id', id)
-      .select()
-      .single();
+      .update({ read: true })
+      .eq('sender_id', otherUserId)
+      .eq('recipient_id', userId)
+      .eq('read', false);
 
     if (error) throw error;
-    return data;
   },
 
   // Supprimer un message
@@ -659,20 +789,21 @@ export const chatService = {
     if (error) throw error;
   },
 
-  // Marquer les messages comme lus
-  async markAsRead(senderId: string, recipientId: string) {
-    const { error } = await supabase
+  // Modifier un message
+  async editMessage(id: string, content: string) {
+    const { data, error } = await supabase
       .from('chat_messages')
-      .update({ read: true })
-      .eq('sender_id', senderId)
-      .eq('recipient_id', recipientId)
-      .eq('read', false);
+      .update({ content, edited: true })
+      .eq('id', id)
+      .select()
+      .single();
 
     if (error) throw error;
+    return data;
   },
 
   // Compter les messages non lus
-  async countUnreadMessages(userId: string) {
+  async countUnread(userId: string) {
     const { count, error } = await supabase
       .from('chat_messages')
       .select('*', { count: 'exact', head: true })
@@ -929,109 +1060,31 @@ export const revenueService = {
 
     return { total, count, average, revenues };
   },
-};
 
-// ============================================
-// FILE STORAGE SERVICE
-// ============================================
+  // Revenus par période
+  async getByPeriod(doctorId: string, period: 'day' | 'week' | 'month' | 'year') {
+    const now = new Date();
+    let startDate: Date;
 
-export const fileService = {
-  // Upload un fichier
-  async upload(file: File, patientId: string, uploadedBy: string) {
-    const fileExt = file.name.split('.').pop();
-    const fileName = `${patientId}/${Date.now()}.${fileExt}`;
+    switch (period) {
+      case 'day':
+        startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        break;
+      case 'week':
+        startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+        break;
+      case 'month':
+        startDate = new Date(now.getFullYear(), now.getMonth(), 1);
+        break;
+      case 'year':
+        startDate = new Date(now.getFullYear(), 0, 1);
+        break;
+    }
 
-    // Upload vers Supabase Storage
-    const { data: uploadData, error: uploadError } = await supabase.storage
-      .from('medical-files')
-      .upload(fileName, file);
-
-    if (uploadError) throw uploadError;
-
-    // Créer l'entrée dans la base de données
-    const { data: fileData, error: fileError } = await supabase
-      .from('medical_files')
-      .insert({
-        patient_id: patientId,
-        name: file.name,
-        type: file.type,
-        size: file.size,
-        storage_path: fileName,
-        uploaded_by: uploadedBy,
-      })
-      .select()
-      .single();
-
-    if (fileError) throw fileError;
-
-    // Générer l'URL publique
-    const { data: { publicUrl } } = supabase.storage
-      .from('medical-files')
-      .getPublicUrl(fileName);
-
-    return {
-      ...fileData,
-      url: publicUrl,
-    };
-  },
-
-  // Récupérer les fichiers d'un patient
-  async getByPatient(patientId: string) {
-    const { data, error } = await supabase
-      .from('medical_files')
-      .select('*')
-      .eq('patient_id', patientId)
-      .order('uploaded_at', { ascending: false });
-
-    if (error) throw error;
-
-    // Ajouter les URLs
-    return (data || []).map((file) => {
-      const { data: { publicUrl } } = supabase.storage
-        .from('medical-files')
-        .getPublicUrl(file.storage_path);
-
-      return {
-        ...file,
-        url: publicUrl,
-      };
-    });
-  },
-
-  // Supprimer un fichier
-  async delete(fileId: string) {
-    // Récupérer le fichier
-    const { data: file, error: fetchError } = await supabase
-      .from('medical_files')
-      .select('*')
-      .eq('id', fileId)
-      .single();
-
-    if (fetchError) throw fetchError;
-
-    // Supprimer du storage
-    const { error: storageError } = await supabase.storage
-      .from('medical-files')
-      .remove([file.storage_path]);
-
-    if (storageError) throw storageError;
-
-    // Supprimer de la base
-    const { error: dbError } = await supabase
-      .from('medical_files')
-      .delete()
-      .eq('id', fileId);
-
-    if (dbError) throw dbError;
-  },
-
-  // Télécharger un fichier
-  async download(storagePath: string) {
-    const { data, error } = await supabase.storage
-      .from('medical-files')
-      .download(storagePath);
-
-    if (error) throw error;
-    return data;
+    return this.getStats(
+      doctorId,
+      startDate.toISOString().split('T')[0],
+      now.toISOString().split('T')[0]
+    );
   },
 };

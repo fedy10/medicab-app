@@ -9,61 +9,30 @@ import { FloatingElement } from '../ui/FloatingElement';
 import { AnimatedBackground } from '../ui/AnimatedBackground';
 import { useUnreadMessages } from '../../hooks/useUnreadMessages';
 import { ProfileModal } from '../modals/ProfileModal';
+import { useProfiles } from '../../hooks/useSupabase';
 
 interface AdminDashboardProps {
-  user: any;
   profile: any;
   onLogout: () => void;
 }
 
-export function AdminDashboard({ user, profile, onLogout }: AdminDashboardProps) {
+export function AdminDashboard({ profile, onLogout }: AdminDashboardProps) {
   const [activeTab, setActiveTab] = useState('overview');
-  const [medecins, setMedecins] = useState<any[]>([]);
-  const [stats, setStats] = useState({
-    totalMedecins: 0,
-    activeMedecins: 0,
-    pendingMedecins: 0,
-    suspendedMedecins: 0,
-    totalRevenue: 0,
-  });
-  const [loading, setLoading] = useState(true);
   const [showChat, setShowChat] = useState(false);
   const [showProfile, setShowProfile] = useState(false);
   const unreadMessagesData = useUnreadMessages(profile.id);
   const unreadMessages = unreadMessagesData.total;
+  
+  // Utiliser le hook Supabase pour charger les profils
+  const { profiles, doctors, loading } = useProfiles();
 
-  useEffect(() => {
-    fetchMedecins();
-  }, []);
-
-  const fetchMedecins = () => {
-    try {
-      setLoading(true);
-      // Get users from localStorage
-      const usersData = localStorage.getItem('demo_users');
-      const users = usersData ? JSON.parse(usersData) : [];
-      
-      const medecinsData = users.filter((u: any) => u.role === 'medecin');
-      setMedecins(medecinsData);
-      
-      // Calculate stats
-      const totalMedecins = medecinsData.length;
-      const activeMedecins = medecinsData.filter((m: any) => m.status === 'active').length;
-      const pendingMedecins = medecinsData.filter((m: any) => m.status === 'pending').length;
-      const suspendedMedecins = medecinsData.filter((m: any) => m.status === 'suspended').length;
-
-      setStats({
-        totalMedecins,
-        activeMedecins,
-        pendingMedecins,
-        suspendedMedecins,
-        totalRevenue: 0,
-      });
-    } catch (error) {
-      console.error('Error fetching medecins:', error);
-    } finally {
-      setLoading(false);
-    }
+  // Calculer les statistiques basées sur les doctors
+  const stats = {
+    totalMedecins: doctors.length,
+    activeMedecins: doctors.filter((m: any) => m.status === 'active').length,
+    pendingMedecins: doctors.filter((m: any) => m.status === 'pending').length,
+    suspendedMedecins: doctors.filter((m: any) => m.status === 'suspended').length,
+    totalRevenue: 0,
   };
 
   const navItems = [
@@ -75,6 +44,7 @@ export function AdminDashboard({ user, profile, onLogout }: AdminDashboardProps)
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 relative">
       <AnimatedBackground />
+      
       {/* Top Navigation */}
       <motion.header
         initial={{ y: -100, opacity: 0 }}
@@ -100,182 +70,182 @@ export function AdminDashboard({ user, profile, onLogout }: AdminDashboardProps)
                 <button
                   key={item.id}
                   onClick={() => setActiveTab(item.id)}
-                  className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all ${
+                  className={`px-4 py-2 rounded-lg font-medium transition-all ${
                     activeTab === item.id
-                      ? 'bg-gradient-to-r from-blue-500 to-purple-600 text-white shadow-lg'
+                      ? 'bg-blue-500 text-white shadow-lg'
                       : 'text-gray-600 hover:bg-gray-100'
                   }`}
                 >
-                  <item.icon className="w-4 h-4" />
+                  <item.icon className="w-5 h-5 inline mr-2" />
                   {item.label}
                 </button>
               ))}
             </nav>
 
-            {/* User Info and Actions */}
-            <div className="flex items-center gap-4">
-              <button
-                onClick={() => setShowChat(!showChat)}
-                className="relative p-2 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
-                style={{ zIndex: 100 }}
+            {/* Right Section */}
+            <div className="flex items-center gap-3">
+              {/* Chat Button */}
+              <motion.button
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                onClick={() => setShowChat(true)}
+                className="relative p-2 rounded-lg bg-gradient-to-r from-blue-500 to-purple-600 text-white hover:shadow-lg transition-all"
               >
                 <MessageCircle className="w-5 h-5" />
                 {unreadMessages > 0 && (
-                  <span className="absolute top-0 right-0 bg-red-500 text-white text-xs rounded-full w-4 h-4 flex items-center justify-center">
+                  <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
                     {unreadMessages}
                   </span>
                 )}
-              </button>
+              </motion.button>
 
-              <button
+              {/* Profile Button */}
+              <motion.button
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
                 onClick={() => setShowProfile(true)}
-                className="p-2 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+                className="p-2 rounded-lg bg-gray-100 hover:bg-gray-200 transition-all"
               >
-                <User className="w-5 h-5" />
-              </button>
-              
-              <div className="hidden md:block text-right">
-                <p className="text-sm text-gray-900">{profile.nom} {profile.prenom}</p>
-                <p className="text-xs text-gray-500">Administrateur</p>
-              </div>
-              
-              <button
+                <User className="w-5 h-5 text-gray-700" />
+              </motion.button>
+
+              {/* Logout Button */}
+              <motion.button
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
                 onClick={onLogout}
-                className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                className="p-2 rounded-lg bg-red-100 hover:bg-red-200 text-red-600 transition-all"
               >
                 <LogOut className="w-5 h-5" />
-              </button>
+              </motion.button>
             </div>
-          </div>
-
-          {/* Mobile Navigation */}
-          <div className="md:hidden flex gap-2 pb-4 overflow-x-auto">
-            {navItems.map((item) => (
-              <button
-                key={item.id}
-                onClick={() => setActiveTab(item.id)}
-                className={`flex items-center gap-2 px-4 py-2 rounded-lg whitespace-nowrap transition-all ${
-                  activeTab === item.id
-                    ? 'bg-gradient-to-r from-blue-500 to-purple-600 text-white'
-                    : 'text-gray-600 bg-gray-100'
-                }`}
-              >
-                <item.icon className="w-4 h-4" />
-                {item.label}
-              </button>
-            ))}
           </div>
         </div>
       </motion.header>
 
       {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Overview Tab */}
         {activeTab === 'overview' && (
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            className="space-y-6"
+            exit={{ opacity: 0, y: -20 }}
           >
-            {/* Stats Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-              <Card3D delay={0}>
-                <div className="bg-white rounded-2xl p-6 shadow-lg border border-gray-100 hover:shadow-2xl transition-shadow">
-                  <div className="flex items-center justify-between mb-4">
-                    <div className="p-3 bg-gradient-to-br from-blue-400 to-blue-600 rounded-xl shadow-lg">
-                      <Users className="w-6 h-6 text-white" />
-                    </div>
-                  </div>
-                  <h3 className="text-gray-900 mb-1">{stats.totalMedecins}</h3>
-                  <p className="text-gray-600">Total Médecins</p>
-                </div>
-              </Card3D>
-
-              <Card3D delay={0.1}>
-                <div className="bg-white rounded-2xl p-6 shadow-lg border border-gray-100 hover:shadow-2xl transition-shadow">
-                  <div className="flex items-center justify-between mb-4">
-                    <div className="p-3 bg-gradient-to-br from-green-400 to-green-600 rounded-xl shadow-lg">
-                      <UserCheck className="w-6 h-6 text-white" />
-                    </div>
-                  </div>
-                  <h3 className="text-gray-900 mb-1">{stats.activeMedecins}</h3>
-                  <p className="text-gray-600">Médecins Actifs</p>
-                </div>
-              </Card3D>
-
-              <Card3D delay={0.2}>
-                <div className="bg-white rounded-2xl p-6 shadow-lg border border-gray-100 hover:shadow-2xl transition-shadow">
-                  <div className="flex items-center justify-between mb-4">
-                    <div className="p-3 bg-gradient-to-br from-yellow-400 to-yellow-600 rounded-xl shadow-lg">
-                      <Calendar className="w-6 h-6 text-white" />
-                    </div>
-                  </div>
-                  <h3 className="text-gray-900 mb-1">{stats.pendingMedecins}</h3>
-                  <p className="text-gray-600">En Attente</p>
-                </div>
-              </Card3D>
-
-              <Card3D delay={0.3}>
-                <div className="bg-white rounded-2xl p-6 shadow-lg border border-gray-100 hover:shadow-2xl transition-shadow">
-                  <div className="flex items-center justify-between mb-4">
-                    <div className="p-3 bg-gradient-to-br from-red-400 to-red-600 rounded-xl shadow-lg">
-                      <UserX className="w-6 h-6 text-white" />
-                    </div>
-                  </div>
-                  <h3 className="text-gray-900 mb-1">{stats.suspendedMedecins}</h3>
-                  <p className="text-gray-600">Suspendus</p>
-                </div>
-              </Card3D>
+            <div className="mb-8">
+              <h2 className="text-gray-900 mb-2">Tableau de Bord Administrateur</h2>
+              <p className="text-gray-600">
+                Bienvenue, {profile.name}
+              </p>
             </div>
 
-            {/* Welcome Message */}
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.4 }}
-              className="bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 rounded-2xl p-8 text-white shadow-2xl relative overflow-hidden"
-            >
-              <div className="absolute inset-0 bg-white/10 backdrop-blur-sm" />
-              <div className="relative z-10">
-                <h2 className="mb-2">Bienvenue, {profile.prenom} !</h2>
-                <p className="text-blue-100">
-                  Gérez efficacement votre plateforme médicale depuis ce tableau de bord.
-                </p>
+            {loading ? (
+              <div className="text-center py-12">
+                <div className="w-16 h-16 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+                <p className="text-gray-600">Chargement des statistiques...</p>
               </div>
-            </motion.div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                {/* Total Médecins */}
+                <FloatingElement delay={0}>
+                  <Card3D>
+                    <div className="p-6">
+                      <div className="flex items-center justify-between mb-4">
+                        <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl flex items-center justify-center">
+                          <Users className="w-6 h-6 text-white" />
+                        </div>
+                        <span className="text-2xl font-bold text-gray-900">{stats.totalMedecins}</span>
+                      </div>
+                      <h3 className="text-gray-600 text-sm">Total Médecins</h3>
+                    </div>
+                  </Card3D>
+                </FloatingElement>
+
+                {/* Médecins Actifs */}
+                <FloatingElement delay={0.1}>
+                  <Card3D>
+                    <div className="p-6">
+                      <div className="flex items-center justify-between mb-4">
+                        <div className="w-12 h-12 bg-gradient-to-br from-green-500 to-green-600 rounded-xl flex items-center justify-center">
+                          <UserCheck className="w-6 h-6 text-white" />
+                        </div>
+                        <span className="text-2xl font-bold text-gray-900">{stats.activeMedecins}</span>
+                      </div>
+                      <h3 className="text-gray-600 text-sm">Médecins Actifs</h3>
+                    </div>
+                  </Card3D>
+                </FloatingElement>
+
+                {/* En Attente */}
+                <FloatingElement delay={0.2}>
+                  <Card3D>
+                    <div className="p-6">
+                      <div className="flex items-center justify-between mb-4">
+                        <div className="w-12 h-12 bg-gradient-to-br from-orange-500 to-orange-600 rounded-xl flex items-center justify-center">
+                          <Calendar className="w-6 h-6 text-white" />
+                        </div>
+                        <span className="text-2xl font-bold text-gray-900">{stats.pendingMedecins}</span>
+                      </div>
+                      <h3 className="text-gray-600 text-sm">En Attente</h3>
+                    </div>
+                  </Card3D>
+                </FloatingElement>
+
+                {/* Suspendus */}
+                <FloatingElement delay={0.3}>
+                  <Card3D>
+                    <div className="p-6">
+                      <div className="flex items-center justify-between mb-4">
+                        <div className="w-12 h-12 bg-gradient-to-br from-red-500 to-red-600 rounded-xl flex items-center justify-center">
+                          <UserX className="w-6 h-6 text-white" />
+                        </div>
+                        <span className="text-2xl font-bold text-gray-900">{stats.suspendedMedecins}</span>
+                      </div>
+                      <h3 className="text-gray-600 text-sm">Suspendus</h3>
+                    </div>
+                  </Card3D>
+                </FloatingElement>
+              </div>
+            )}
           </motion.div>
         )}
 
+        {/* Médecins Management Tab */}
         {activeTab === 'medecins' && (
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
           >
-            <MedecinsManagement onUpdate={fetchMedecins} />
+            <MedecinsManagement />
           </motion.div>
         )}
 
+        {/* Revenue Tab */}
         {activeTab === 'revenue' && (
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
           >
             <AdminRevenueView />
           </motion.div>
         )}
-      </main>
+      </div>
 
-      {/* Chat Component */}
+      {/* Chat Modal */}
       {showChat && (
-        <div className="fixed bottom-6 right-6 z-[100]">
-          <AdminChat userId={profile.id} userName={`${profile.nom} ${profile.prenom}`} unreadCount={unreadMessages} />
-        </div>
+        <AdminChat
+          adminId={profile.id}
+          adminName={profile.name}
+          onClose={() => setShowChat(false)}
+        />
       )}
 
       {/* Profile Modal */}
       {showProfile && (
         <ProfileModal
-          user={profile}
-          isOpen={showProfile}
+          profile={profile}
           onClose={() => setShowProfile(false)}
         />
       )}

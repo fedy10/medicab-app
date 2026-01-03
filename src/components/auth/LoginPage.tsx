@@ -233,6 +233,8 @@ export function LoginPage({
             </div>
           </div>
         </div>
+
+        {/* Suppression de la section des comptes de démo - Migration Supabase */}
       </motion.div>
     </div>
   );

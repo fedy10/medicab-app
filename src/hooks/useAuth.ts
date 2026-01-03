@@ -20,63 +20,26 @@ export function useAuth() {
   });
 
   useEffect(() => {
-    let mounted = true;
-
-    console.log('🔄 useAuth: Initialisation...');
-
-    // Timeout de sécurité augmenté à 5 secondes
-    const timeoutId = setTimeout(() => {
-      if (mounted && authState.loading) {
-        console.warn('⚠️ Timeout lors de la vérification de session (5s écoulées)');
+    // Récupérer la session actuelle
+    authService.getCurrentSession().then((session) => {
+      if (session) {
+        setAuthState({
+          user: session.user,
+          profile: session.profile,
+          loading: false,
+        });
+      } else {
         setAuthState({
           user: null,
           profile: null,
           loading: false,
         });
       }
-    }, 5000);  // 5 secondes au lieu de 3
-
-    // Récupérer la session actuelle
-    authService.getCurrentSession()
-      .then((session) => {
-        if (!mounted) return;
-        
-        clearTimeout(timeoutId);
-        
-        console.log('✅ Session récupérée:', session ? 'Connecté' : 'Non connecté');
-        
-        if (session) {
-          setAuthState({
-            user: session.user,
-            profile: session.profile,
-            loading: false,
-          });
-        } else {
-          setAuthState({
-            user: null,
-            profile: null,
-            loading: false,
-          });
-        }
-      })
-      .catch((error) => {
-        if (!mounted) return;
-        
-        clearTimeout(timeoutId);
-        console.error('❌ Erreur lors de la récupération de session:', error);
-        
-        setAuthState({
-          user: null,
-          profile: null,
-          loading: false,
-        });
-      });
+    });
 
     // Écouter les changements d'authentification
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
-        if (!mounted) return;
-        
         if (event === 'SIGNED_IN' && session) {
           const { data: profile } = await supabase
             .from('profiles')
@@ -100,8 +63,6 @@ export function useAuth() {
     );
 
     return () => {
-      mounted = false;
-      clearTimeout(timeoutId);
       subscription.unsubscribe();
     };
   }, []);

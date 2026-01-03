@@ -1,50 +1,36 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { ChevronLeft, ChevronRight, Plus, Check, X, Search, Clock, User, Edit, Trash2, FileText, Calendar, Briefcase, Globe, MapPin } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Plus, Check, X, Clock, User, Edit, Trash2, Calendar, Briefcase, Globe, MapPin, Phone } from 'lucide-react';
 import { AppointmentConfirmation } from './AppointmentConfirmation';
 import { useLanguage } from '../../contexts/LanguageContext';
-
-interface Appointment {
-  id: string;
-  patientName: string;
-  patientPhone: string;
-  date: string; // Added date field (YYYY-MM-DD format)
-  time: string;
-  isConfirmed: boolean;
-  type: 'consultation' | 'control';
-  isNewPatient?: boolean;
-  birthDate?: string;
-  profession?: string;
-  pays?: string;
-  region?: string;
-  paymentType?: 'normal' | 'cnam' | 'insurance' | 'free';
-  amountPaid?: number;
-}
+import { useAppointments, usePatients } from '../../hooks/useSupabase';
+import { patientService } from '../../lib/services/supabaseService';
+import { supabase } from '../../lib/supabase';
 
 interface CalendarViewProps {
   doctorId: string;
 }
 
-// Base de données des patients existants
-const existingPatients = [
-  { name: 'Mohamed Gharbi', phone: '+216 98 123 456' },
-  { name: 'Amira Ben Said', phone: '+216 22 987 654' },
-  { name: 'Salma Trabelsi', phone: '+216 29 654 321' },
-];
-
-// Tarif du médecin (pourrait venir de l'API/base de données)
-const DOCTOR_TARIFF = 60;
-
 export function CalendarView({ doctorId }: CalendarViewProps) {
-  const { t, language } = useLanguage();
+  const { t } = useLanguage();
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [showAddAppointment, setShowAddAppointment] = useState(false);
-  const [showConfirmDialog, setShowConfirmDialog] = useState<Appointment | null>(null);
-  const [showDeleteDialog, setShowDeleteDialog] = useState<Appointment | null>(null);
-  const [editingAppointment, setEditingAppointment] = useState<Appointment | null>(null);
+  const [showConfirmDialog, setShowConfirmDialog] = useState<any | null>(null);
+  const [showDeleteDialog, setShowDeleteDialog] = useState<any | null>(null);
+  const [editingAppointment, setEditingAppointment] = useState<any | null>(null);
   const [successMessage, setSuccessMessage] = useState('');
+  const [processing, setProcessing] = useState(false);
 
-  const [appointments, setAppointments] = useState<Appointment[]>([]);
+  // Utiliser les hooks Supabase
+  const { 
+    appointments, 
+    loading, 
+    createAppointment, 
+    updateAppointment, 
+    deleteAppointment 
+  } = useAppointments(doctorId);
+
+  const { patients } = usePatients(doctorId);
 
   const [newAppointment, setNewAppointment] = useState({
     patientName: '',
@@ -53,11 +39,86 @@ export function CalendarView({ doctorId }: CalendarViewProps) {
     profession: '',
     pays: '',
     region: '',
-    time: '',
-    type: 'consultation' as 'consultation' | 'control',
+    hour: '09',
+    minute: '00',
   });
 
-  // Régions par pays avec emojis
+  const [editFormData, setEditFormData] = useState({
+    patientName: '',
+    patientPhone: '',
+    birthDate: '',
+    profession: '',
+    pays: '',
+    region: '',
+    hour: '09',
+    minute: '00',
+    date: '',
+  });
+
+  const [searchResults, setSearchResults] = useState<any[]>([]);
+  const [showSearchResults, setShowSearchResults] = useState(false);
+  const [doctorTarif, setDoctorTarif] = useState(60);
+
+  // Charger le tarif du médecin
+  useEffect(() => {
+    const loadDoctorTarif = async () => {
+      try {
+        const { data } = await supabase
+          .from('profiles')
+          .select('tarif')
+          .eq('id', doctorId)
+          .single();
+
+        if (data && data.tarif) {
+          setDoctorTarif(data.tarif);
+        }
+      } catch (error) {
+        console.error('Erreur chargement tarif:', error);
+      }
+    };
+
+    loadDoctorTarif();
+  }, [doctorId]);
+
+  // Options pour les sélecteurs
+  const hours = Array.from({ length: 24 }, (_, i) => i.toString().padStart(2, '0'));
+  const minutes = ['00', '05', '10', '15', '20', '25', '30', '35', '40', '45', '50', '55'];
+
+  // Recherche de patients
+  const handlePatientSearch = (searchTerm: string, field: 'name' | 'phone') => {
+    if (searchTerm.length < 2) {
+      setSearchResults([]);
+      setShowSearchResults(false);
+      return;
+    }
+
+    const results = patients.filter(p => {
+      if (field === 'name') {
+        return p.name.toLowerCase().includes(searchTerm.toLowerCase());
+      } else {
+        return p.phone?.includes(searchTerm) || false;
+      }
+    });
+
+    setSearchResults(results);
+    setShowSearchResults(results.length > 0);
+  };
+
+  const selectPatient = (patient: any) => {
+    setNewAppointment({
+      ...newAppointment,
+      patientName: patient.name,
+      patientPhone: patient.phone || '',
+      birthDate: patient.birth_date || '',
+      profession: patient.profession || '',
+      pays: patient.pays || '',
+      region: patient.region || '',
+    });
+    setShowSearchResults(false);
+    setSearchResults([]);
+  };
+
+  // Régions par pays
   const regionsByCountry: { [key: string]: { name: string; groups: { label: string; regions: string[] }[] } } = {
     'Tunisie': {
       name: '🇹🇳 Tunisie',
@@ -109,112 +170,15 @@ export function CalendarView({ doctorId }: CalendarViewProps) {
           regions: ['🏛️ Alger', '🏙️ Oran', '🌆 Constantine', '🏘️ Annaba']
         },
         {
-          label: '🌊 Nord',
-          regions: ['🏖️ Blida', '🏝️ Béjaïa', '⚓ Skikda', '🌊 Mostaganem']
-        },
-        {
-          label: '⛰️ Hauts Plateaux',
-          regions: ['⛰️ Batna', '🏔️ Sétif', '🌾 Tiaret', '🏘️ Bordj Bou Arreridj']
+          label: '🌊 Côte',
+          regions: ['🏖️ Béjaïa', '⚓ Tizi Ouzou', '🏝️ Skikda', '🌊 Mostaganem']
         },
         {
           label: '🏜️ Sud',
-          regions: ['🏜️ Djelfa', '🌴 Biskra', '⛰️ Tébessa', '🏔️ Tlemcen', '🌾 Sidi Bel Abbès']
-        }
-      ]
-    },
-    'Autre': {
-      name: '🌍 Autre',
-      groups: [
-        {
-          label: '🌐 Autres Régions',
-          regions: ['🌍 Autre région']
+          regions: ['🏜️ Ouargla', '🌴 Ghardaïa', '⛰️ Tamanrasset', '🏔️ Adrar']
         }
       ]
     }
-  };
-
-  // Obtenir les régions disponibles selon le pays sélectionné
-  const getAvailableRegions = (country: string) => {
-    if (!country || !regionsByCountry[country]) return [];
-    return regionsByCountry[country].groups;
-  };
-
-  // Load appointments from localStorage on mount
-  useEffect(() => {
-    const key = `appointments_${doctorId}`;
-    const stored = localStorage.getItem(key);
-    if (stored) {
-      try {
-        const data = JSON.parse(stored);
-        setAppointments(data);
-      } catch (error) {
-        console.error('Error loading appointments:', error);
-        // Set default appointments if loading fails
-        setDefaultAppointments();
-      }
-    } else {
-      // Set default appointments for first time
-      setDefaultAppointments();
-    }
-  }, [doctorId]);
-
-  // Save appointments to localStorage whenever they change
-  useEffect(() => {
-    if (appointments.length > 0) {
-      const key = `appointments_${doctorId}`;
-      localStorage.setItem(key, JSON.stringify(appointments));
-    }
-  }, [appointments, doctorId]);
-
-  const setDefaultAppointments = () => {
-    const today = new Date().toISOString().split('T')[0];
-    const defaultAppointments: Appointment[] = [
-      {
-        id: '1',
-        patientName: 'Mohamed Gharbi',
-        patientPhone: '+216 98 123 456',
-        date: today,
-        time: '09:00',
-        isConfirmed: true,
-        type: 'consultation',
-        isNewPatient: false,
-        paymentType: 'normal',
-        amountPaid: 60,
-      },
-      {
-        id: '2',
-        patientName: 'Amira Ben Said',
-        patientPhone: '+216 22 987 654',
-        date: today,
-        time: '10:00',
-        isConfirmed: false,
-        type: 'control',
-        isNewPatient: false,
-      },
-      {
-        id: '3',
-        patientName: 'Youssef Hamdi',
-        patientPhone: '+216 55 321 789',
-        date: today,
-        time: '11:00',
-        isConfirmed: true,
-        type: 'consultation',
-        isNewPatient: true,
-        paymentType: 'cnam',
-        amountPaid: 40,
-      },
-      {
-        id: '4',
-        patientName: 'Salma Trabelsi',
-        patientPhone: '+216 29 654 321',
-        date: today,
-        time: '14:00',
-        isConfirmed: false,
-        type: 'consultation',
-        isNewPatient: false,
-      },
-    ];
-    setAppointments(defaultAppointments);
   };
 
   const showSuccess = (message: string) => {
@@ -222,10 +186,32 @@ export function CalendarView({ doctorId }: CalendarViewProps) {
     setTimeout(() => setSuccessMessage(''), 3000);
   };
 
-  const checkIfExistingPatient = (phone: string, name: string): boolean => {
-    return existingPatients.some(
-      (patient) => patient.phone === phone || patient.name.toLowerCase() === name.toLowerCase()
-    );
+  const findExistingPatient = async (phone: string) => {
+    try {
+      const existingPatient = patients.find(p => p.phone === phone);
+      
+      if (existingPatient) {
+        console.log('✅ Patient existant trouvé:', existingPatient.name);
+        return existingPatient;
+      }
+      
+      console.log('ℹ️ Nouveau patient');
+      return null;
+    } catch (error) {
+      console.error('Erreur recherche patient:', error);
+      return null;
+    }
+  };
+
+  const calculateAge = (birthDate: string): number => {
+    const today = new Date();
+    const birth = new Date(birthDate);
+    let age = today.getFullYear() - birth.getFullYear();
+    const monthDifference = today.getMonth() - birth.getMonth();
+    if (monthDifference < 0 || (monthDifference === 0 && today.getDate() < birth.getDate())) {
+      age--;
+    }
+    return age;
   };
 
   const daysInMonth = new Date(
@@ -240,149 +226,324 @@ export function CalendarView({ doctorId }: CalendarViewProps) {
     1
   ).getDay();
 
+  const handlePreviousMonth = () => {
+    setSelectedDate(
+      new Date(selectedDate.getFullYear(), selectedDate.getMonth() - 1)
+    );
+  };
+
+  const handleNextMonth = () => {
+    setSelectedDate(
+      new Date(selectedDate.getFullYear(), selectedDate.getMonth() + 1)
+    );
+  };
+
+  const handleDayClick = (day: number) => {
+    setSelectedDate(
+      new Date(selectedDate.getFullYear(), selectedDate.getMonth(), day)
+    );
+  };
+
+  const handleEditClick = async (apt: any) => {
+    try {
+      // Charger les données du patient depuis la base de données
+      const { data: patientData } = await supabase
+        .from('patients')
+        .select('*')
+        .eq('id', apt.patient_id)
+        .single();
+
+      const [hour, minute] = apt.time.split(':');
+
+      if (patientData) {
+        setEditFormData({
+          patientName: patientData.name || apt.patient_name,
+          patientPhone: patientData.phone || '',
+          birthDate: patientData.birth_date || '',
+          profession: patientData.profession || '',
+          pays: patientData.pays || '',
+          region: patientData.region || '',
+          hour: hour || '09',
+          minute: minute || '00',
+          date: apt.date,
+        });
+      } else {
+        // Fallback si pas de données patient
+        setEditFormData({
+          patientName: apt.patient_name,
+          patientPhone: '',
+          birthDate: '',
+          profession: '',
+          pays: '',
+          region: '',
+          hour: hour || '09',
+          minute: minute || '00',
+          date: apt.date,
+        });
+      }
+
+      setEditingAppointment(apt);
+    } catch (error) {
+      console.error('Erreur chargement patient:', error);
+      const [hour, minute] = apt.time.split(':');
+      setEditFormData({
+        patientName: apt.patient_name,
+        patientPhone: '',
+        birthDate: '',
+        profession: '',
+        pays: '',
+        region: '',
+        hour: hour || '09',
+        minute: minute || '00',
+        date: apt.date,
+      });
+      setEditingAppointment(apt);
+    }
+  };
+
+  const handleAddAppointment = async () => {
+    if (!newAppointment.patientName || !newAppointment.patientPhone) {
+      alert('Veuillez remplir tous les champs obligatoires');
+      return;
+    }
+
+    try {
+      setProcessing(true);
+      console.log('🔄 Création du rendez-vous...');
+
+      const existingPatient = await findExistingPatient(newAppointment.patientPhone);
+      
+      let patientId = existingPatient?.id;
+      let isNewPatient = false;
+
+      if (!existingPatient) {
+        console.log('📝 Création d\'un nouveau patient...');
+        isNewPatient = true;
+        
+        const patientData = {
+          name: newAppointment.patientName,
+          phone: newAppointment.patientPhone,
+          doctor_id: doctorId,
+          age: newAppointment.birthDate ? calculateAge(newAppointment.birthDate) : null,
+          birth_date: newAppointment.birthDate || null,
+          profession: newAppointment.profession || null,
+          pays: newAppointment.pays || null,
+          region: newAppointment.region || null,
+          address: newAppointment.region && newAppointment.pays 
+            ? `${newAppointment.region}, ${newAppointment.pays}` 
+            : null,
+          diseases: [],
+        };
+
+        const createdPatient = await patientService.create(patientData);
+        patientId = createdPatient.id;
+        console.log('✅ Patient créé:', createdPatient.name, createdPatient.id);
+      } else {
+        console.log('✅ Utilisation du patient existant:', existingPatient.name);
+      }
+
+      const appointmentDate = selectedDate.toISOString().split('T')[0];
+      const time = `${newAppointment.hour}:${newAppointment.minute}`;
+      
+      await createAppointment({
+        patient_id: patientId,
+        patient_name: newAppointment.patientName,
+        doctor_id: doctorId,
+        date: appointmentDate,
+        time: time,
+        duration: 30,
+        type: 'consultation',
+        status: 'scheduled',
+        created_by: doctorId,
+        notes: isNewPatient ? '🆕 Nouveau patient' : null,
+      });
+
+      console.log('✅ Rendez-vous créé avec succès !');
+      showSuccess(isNewPatient ? '✅ Rendez-vous créé (Nouveau patient)' : '✅ Rendez-vous créé');
+      
+      setNewAppointment({
+        patientName: '',
+        patientPhone: '',
+        birthDate: '',
+        profession: '',
+        pays: '',
+        region: '',
+        hour: '09',
+        minute: '00',
+      });
+      
+      setShowAddAppointment(false);
+    } catch (error: any) {
+      console.error('❌ Erreur création rendez-vous:', error);
+      alert('❌ Erreur: ' + error.message);
+    } finally {
+      setProcessing(false);
+    }
+  };
+
+  const handleConfirmAppointment = async (paymentInfo: {
+    paymentType: 'normal' | 'cnam' | 'insurance' | 'free';
+    amountPaid?: number;
+  }) => {
+    try {
+      setProcessing(true);
+
+      if (!showConfirmDialog) return;
+
+      const appointment = showConfirmDialog;
+
+      let paymentType: 'normal' | 'gratuit' | 'assurance' = 'normal';
+      if (paymentInfo.paymentType === 'free') {
+        paymentType = 'gratuit';
+      } else if (paymentInfo.paymentType === 'cnam' || paymentInfo.paymentType === 'insurance') {
+        paymentType = 'assurance';
+      }
+
+      let paymentAmount = doctorTarif;
+      let insurancePatientAmount = null;
+      let insuranceReimbursedAmount = null;
+
+      if (paymentType === 'gratuit') {
+        paymentAmount = 0;
+      } else if (paymentType === 'assurance' && paymentInfo.amountPaid !== undefined) {
+        insurancePatientAmount = paymentInfo.amountPaid;
+        insuranceReimbursedAmount = doctorTarif - insurancePatientAmount;
+        paymentAmount = insurancePatientAmount;
+      }
+
+      await updateAppointment(appointment.id, {
+        status: 'completed',
+        payment_amount: paymentAmount,
+        payment_type: paymentType,
+        insurance_patient_amount: insurancePatientAmount,
+        insurance_reimbursed_amount: insuranceReimbursedAmount,
+      });
+
+      const { error: consultationError } = await supabase
+        .from('consultations')
+        .insert({
+          patient_id: appointment.patient_id,
+          patient_name: appointment.patient_name,
+          doctor_id: doctorId,
+          appointment_id: appointment.id,
+          date: appointment.date,
+          time: appointment.time,
+          payment_type: paymentType,
+          payment_amount: paymentAmount,
+          insurance_patient_amount: insurancePatientAmount,
+          insurance_reimbursed_amount: insuranceReimbursedAmount,
+          symptoms: null,
+          diagnosis: null,
+          prescription: null,
+          notes: '',
+          files: null,
+        });
+
+      if (consultationError) {
+        console.error('Erreur création consultation:', consultationError);
+        throw consultationError;
+      }
+
+      console.log('✅ Rendez-vous confirmé et consultation créée !');
+      showSuccess('✅ Rendez-vous confirmé et consultation créée !');
+      setShowConfirmDialog(null);
+    } catch (error: any) {
+      console.error('❌ Erreur confirmation:', error);
+      alert('❌ Erreur: ' + error.message);
+    } finally {
+      setProcessing(false);
+    }
+  };
+
+  const handleDeleteAppointment = async (appointment: any) => {
+    try {
+      await deleteAppointment(appointment.id);
+      showSuccess('✅ Rendez-vous supprimé');
+      setShowDeleteDialog(null);
+    } catch (error: any) {
+      console.error('Erreur suppression:', error);
+      alert('❌ Erreur: ' + error.message);
+    }
+  };
+
+  const handleUpdateAppointment = async () => {
+    if (!editingAppointment) return;
+
+    try {
+      setProcessing(true);
+
+      // Mettre à jour les informations du patient
+      const patientUpdateData: any = {
+        name: editFormData.patientName,
+        phone: editFormData.patientPhone,
+      };
+
+      if (editFormData.birthDate) {
+        patientUpdateData.birth_date = editFormData.birthDate;
+        patientUpdateData.age = calculateAge(editFormData.birthDate);
+      }
+      if (editFormData.profession) patientUpdateData.profession = editFormData.profession;
+      if (editFormData.pays) patientUpdateData.pays = editFormData.pays;
+      if (editFormData.region) patientUpdateData.region = editFormData.region;
+      if (editFormData.region && editFormData.pays) {
+        patientUpdateData.address = `${editFormData.region}, ${editFormData.pays}`;
+      }
+
+      // Mettre à jour le patient
+      await supabase
+        .from('patients')
+        .update(patientUpdateData)
+        .eq('id', editingAppointment.patient_id);
+
+      const time = `${editFormData.hour}:${editFormData.minute}`;
+
+      // Mettre à jour le rendez-vous
+      await updateAppointment(editingAppointment.id, {
+        patient_name: editFormData.patientName,
+        time: time,
+        date: editFormData.date,
+      });
+      
+      showSuccess('✅ Rendez-vous modifié');
+      setEditingAppointment(null);
+    } catch (error: any) {
+      console.error('Erreur modification:', error);
+      alert('❌ Erreur: ' + error.message);
+    } finally {
+      setProcessing(false);
+    }
+  };
+
+  const selectedDateString = selectedDate.toISOString().split('T')[0];
+  const todayAppointments = appointments.filter(
+    (apt) => apt.date === selectedDateString
+  ).sort((a, b) => a.time.localeCompare(b.time));
+
   const monthNames = [
     'Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin',
     'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre'
   ];
 
-  // Générer les heures de travail (8h - 20h)
-  const workingHours = Array.from({ length: 13 }, (_, i) => i + 8); // 8h à 20h
+  const dayNames = ['Dim', 'Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam'];
 
-  const handlePrevMonth = () => {
-    setSelectedDate(new Date(selectedDate.getFullYear(), selectedDate.getMonth() - 1));
-  };
-
-  const handleNextMonth = () => {
-    setSelectedDate(new Date(selectedDate.getFullYear(), selectedDate.getMonth() + 1));
-  };
-
-  const handleAddAppointment = () => {
-    if (newAppointment.patientName && newAppointment.patientPhone && newAppointment.time) {
-      const isExisting = checkIfExistingPatient(newAppointment.patientPhone, newAppointment.patientName);
-      
-      setAppointments([
-        ...appointments,
-        {
-          id: Date.now().toString(),
-          patientName: newAppointment.patientName,
-          patientPhone: newAppointment.patientPhone,
-          date: selectedDate.toISOString().split('T')[0],
-          time: newAppointment.time,
-          type: newAppointment.type,
-          isConfirmed: false,
-          isNewPatient: !isExisting,
-          birthDate: newAppointment.birthDate,
-          profession: newAppointment.profession,
-          pays: newAppointment.pays,
-          region: newAppointment.region,
-        },
-      ]);
-      
-      // Ajouter le patient à la liste s'il est nouveau
-      if (!isExisting) {
-        existingPatients.push({
-          name: newAppointment.patientName,
-          phone: newAppointment.patientPhone,
-        });
-      }
-      
-      setNewAppointment({ patientName: '', patientPhone: '', birthDate: '', profession: '', pays: '', region: '', time: '', type: 'consultation' });
-      setEditingAppointment(null);
-      setShowAddAppointment(false);
-      showSuccess(t('appointment_saved'));
-    }
-  };
-
-  const handleEditAppointment = (appointment: Appointment) => {
-    setEditingAppointment(appointment);
-    setNewAppointment({
-      patientName: appointment.patientName,
-      patientPhone: appointment.patientPhone,
-      birthDate: appointment.birthDate || '',
-      profession: appointment.profession || '',
-      pays: appointment.pays || '',
-      region: appointment.region || '',
-      time: appointment.time,
-      type: appointment.type,
-    });
-    setShowAddAppointment(true);
-  };
-
-  const handleUpdateAppointment = () => {
-    if (editingAppointment && newAppointment.patientName && newAppointment.patientPhone && newAppointment.time) {
-      setAppointments(
-        appointments.map((apt) =>
-          apt.id === editingAppointment.id
-            ? {
-                ...apt,
-                patientName: newAppointment.patientName,
-                patientPhone: newAppointment.patientPhone,
-                birthDate: newAppointment.birthDate,
-                profession: newAppointment.profession,
-                pays: newAppointment.pays,
-                region: newAppointment.region,
-                time: newAppointment.time,
-                type: newAppointment.type,
-              }
-            : apt
-        )
-      );
-      setNewAppointment({ patientName: '', patientPhone: '', birthDate: '', profession: '', pays: '', region: '', time: '', type: 'consultation' });
-      setEditingAppointment(null);
-      setShowAddAppointment(false);
-      showSuccess(t('updated_successfully'));
-    }
-  };
-
-  const handleDeleteAppointment = (appointment: Appointment) => {
-    setShowDeleteDialog(appointment);
-  };
-
-  const confirmDelete = () => {
-    if (showDeleteDialog) {
-      setAppointments(appointments.filter((apt) => apt.id !== showDeleteDialog.id));
-      setShowDeleteDialog(null);
-      showSuccess(t('appointment_deleted'));
-    }
-  };
-
-  const handleConfirmAppointment = (paymentInfo: {
-    paymentType: 'normal' | 'cnam' | 'insurance' | 'free';
-    amountPaid?: number;
-  }) => {
-    if (showConfirmDialog) {
-      setAppointments(
-        appointments.map((apt) =>
-          apt.id === showConfirmDialog.id 
-            ? { 
-                ...apt, 
-                isConfirmed: true,
-                paymentType: paymentInfo.paymentType,
-                amountPaid: paymentInfo.amountPaid || 0,
-              } 
-            : apt
-        )
-      );
-      setShowConfirmDialog(null);
-      showSuccess(t('appointment_confirmed'));
-    }
-  };
-
-  const todayAppointments = appointments.filter((apt) => {
-    const today = new Date().toDateString();
-    return selectedDate.toDateString() === today;
-  });
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <div className="w-16 h-16 border-4 border-purple-500 border-t-transparent rounded-full animate-spin"></div>
+      </div>
+    );
+  }
 
   return (
-    <div className="space-y-6">
-      {/* Success message */}
+    <div className="space-y-4">
+      {/* Success Message */}
       <AnimatePresence>
         {successMessage && (
           <motion.div
-            initial={{ opacity: 0, y: -50 }}
+            initial={{ opacity: 0, y: -20 }}
             animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -50 }}
-            className="fixed top-20 left-1/2 -translate-x-1/2 z-50 bg-green-500 text-white px-6 py-3 rounded-xl shadow-lg flex items-center gap-2"
+            exit={{ opacity: 0, y: -20 }}
+            className="fixed top-20 right-4 bg-green-500 text-white px-6 py-3 rounded-xl shadow-lg z-50 flex items-center gap-2"
           >
             <Check className="w-5 h-5" />
             {successMessage}
@@ -390,908 +551,514 @@ export function CalendarView({ doctorId }: CalendarViewProps) {
         )}
       </AnimatePresence>
 
-      {/* Modern Split View: Calendar + Daily Schedule */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
-        {/* LEFT SIDE - Calendar */}
-        <div className="lg:col-span-4">
+      {/* Header avec bouton */}
+      <div className="flex items-center justify-between mb-4">
+        <h2 className="text-gray-900">Calendrier des rendez-vous</h2>
+        <motion.button
+          whileHover={{ scale: 1.05 }}
+          whileTap={{ scale: 0.95 }}
+          onClick={() => setShowAddAppointment(true)}
+          className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-purple-500 to-pink-600 text-white rounded-xl shadow-lg hover:shadow-xl transition-all"
+        >
+          <Plus className="w-5 h-5" />
+          Nouveau rendez-vous
+        </motion.button>
+      </div>
+
+      {/* Layout: Calendrier à gauche (compact) + Planning à droite */}
+      <div className="grid grid-cols-1 md:grid-cols-12 gap-4 md:gap-6">
+        {/* CALENDRIER - GAUCHE (3 colonnes - plus compact) */}
+        <div className="md:col-span-3 lg:col-span-3">
           <motion.div
-            initial={{ opacity: 0, x: -50 }}
+            initial={{ opacity: 0, x: -20 }}
             animate={{ opacity: 1, x: 0 }}
-            className="bg-white rounded-2xl p-4 shadow-xl border border-gray-100 sticky top-24"
+            className="bg-white rounded-2xl shadow-xl p-4"
             style={{
-              background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
+              background: 'linear-gradient(135deg, #ffffff 0%, #fef3f8 100%)',
             }}
           >
-            {/* Calendar Header */}
-            <div className="flex items-center justify-between mb-3">
+            {/* Navigation mois */}
+            <div className="flex items-center justify-between mb-4">
               <motion.button
-                onClick={handlePrevMonth}
-                whileHover={{ scale: 1.1, x: -2 }}
+                whileHover={{ scale: 1.1 }}
                 whileTap={{ scale: 0.9 }}
-                className="p-2 hover:bg-gradient-to-br hover:from-blue-50 hover:to-purple-50 rounded-lg transition-all"
+                onClick={handlePreviousMonth}
+                className="p-2 hover:bg-purple-100 rounded-lg transition-colors"
               >
-                <ChevronLeft className="w-4 h-4 text-gray-700" />
+                <ChevronLeft className="w-4 h-4 text-purple-600" />
               </motion.button>
-              
-              <motion.div
-                initial={{ scale: 0.9 }}
-                animate={{ scale: 1 }}
-                className="text-center"
-              >
-                <h2 className="text-base font-semibold text-gray-900">
-                  {monthNames[selectedDate.getMonth()]}
-                </h2>
-                <p className="text-xs text-gray-500">{selectedDate.getFullYear()}</p>
-              </motion.div>
-              
+              <h3 className="text-base font-semibold text-gray-900">
+                {monthNames[selectedDate.getMonth()]} {selectedDate.getFullYear()}
+              </h3>
               <motion.button
+                whileHover={{ scale: 1.1 }}
+                whileTap={{ scale: 0.9 }}
                 onClick={handleNextMonth}
-                whileHover={{ scale: 1.1, x: 2 }}
-                whileTap={{ scale: 0.9 }}
-                className="p-2 hover:bg-gradient-to-br hover:from-blue-50 hover:to-purple-50 rounded-lg transition-all"
+                className="p-2 hover:bg-purple-100 rounded-lg transition-colors"
               >
-                <ChevronRight className="w-4 h-4 text-gray-700" />
+                <ChevronRight className="w-4 h-4 text-purple-600" />
               </motion.button>
             </div>
 
-            {/* Calendar Grid */}
-            <div className="space-y-1">
-              {/* Weekday Headers */}
-              <div className="grid grid-cols-7 gap-1 mb-2">
-                {['Dim', 'Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam'].map((day) => (
-                  <div key={day} className="text-center text-[10px] font-medium text-gray-500 py-1">
-                    {day}
-                  </div>
-                ))}
-              </div>
-
-              {/* Days Grid */}
-              <div className="grid grid-cols-7 gap-1">
-                {[...Array(firstDayOfMonth)].map((_, i) => (
-                  <div key={`empty-${i}`} />
-                ))}
-                {[...Array(daysInMonth)].map((_, i) => {
-                  const day = i + 1;
-                  const date = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), day);
-                  const dateStr = date.toISOString().split('T')[0];
-                  const hasAppointments = appointments.some(apt => apt.date === dateStr);
-                  
-                  const isToday =
-                    day === new Date().getDate() &&
-                    selectedDate.getMonth() === new Date().getMonth() &&
-                    selectedDate.getFullYear() === new Date().getFullYear();
-                  const isSelected =
-                    day === selectedDate.getDate();
-
-                  return (
-                    <motion.button
-                      key={day}
-                      whileHover={{ scale: 1.15, rotateZ: 3 }}
-                      whileTap={{ scale: 0.9 }}
-                      onClick={() =>
-                        setSelectedDate(
-                          new Date(selectedDate.getFullYear(), selectedDate.getMonth(), day)
-                        )
-                      }
-                      className={`relative aspect-square p-1 rounded-lg transition-all ${
-                        isToday
-                          ? 'bg-gradient-to-br from-blue-500 to-purple-600 text-white shadow-md shadow-blue-300'
-                          : isSelected
-                          ? 'bg-gradient-to-br from-blue-100 to-purple-100 text-blue-700 border border-blue-400'
-                          : 'hover:bg-gradient-to-br hover:from-gray-50 hover:to-gray-100'
-                      }`}
-                      style={{
-                        transform: isSelected ? 'translateZ(20px)' : 'translateZ(0)',
-                        transformStyle: 'preserve-3d',
-                      }}
-                    >
-                      <span className={`text-xs ${isToday ? 'font-bold' : ''}`}>{day}</span>
-                      {hasAppointments && !isToday && (
-                        <div className="absolute bottom-0.5 left-1/2 -translate-x-1/2 w-1 h-1 bg-blue-500 rounded-full" />
-                      )}
-                    </motion.button>
-                  );
-                })}
-              </div>
+            {/* Noms des jours */}
+            <div className="grid grid-cols-7 gap-0.5 mb-1">
+              {dayNames.map((day) => (
+                <div key={day} className="text-center text-xs font-medium text-gray-500 py-1">
+                  {day}
+                </div>
+              ))}
             </div>
 
-            {/* Add Appointment Button */}
-            <motion.button
-              whileHover={{ scale: 1.02, y: -2 }}
-              whileTap={{ scale: 0.98 }}
-              onClick={() => {
-                setEditingAppointment(null);
-                setNewAppointment({ patientName: '', patientPhone: '', birthDate: '', profession: '', pays: '', region: '', time: '', type: 'consultation' });
-                setShowAddAppointment(true);
-              }}
-              className="w-full mt-3 flex items-center justify-center gap-2 px-4 py-2.5 bg-gradient-to-r from-blue-500 to-purple-600 text-white rounded-xl shadow-md hover:shadow-lg transition-all text-sm"
-            >
-              <Plus className="w-4 h-4" />
-              <span>{t('new_appointment')}</span>
-            </motion.button>
+            {/* Grille des jours */}
+            <div className="grid grid-cols-7 gap-0.5">
+              {Array.from({ length: firstDayOfMonth }).map((_, index) => (
+                <div key={`empty-${index}`} className="aspect-square" />
+              ))}
+
+              {Array.from({ length: daysInMonth }).map((_, index) => {
+                const day = index + 1;
+                const date = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), day);
+                const dateString = date.toISOString().split('T')[0];
+                const dayAppointments = appointments.filter(apt => apt.date === dateString);
+                const isSelected = day === selectedDate.getDate();
+                const isToday = dateString === new Date().toISOString().split('T')[0];
+
+                return (
+                  <motion.button
+                    key={day}
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                    onClick={() => handleDayClick(day)}
+                    className={`aspect-square rounded-lg p-0.5 text-xs transition-all relative flex flex-col items-center justify-center ${
+                      isSelected
+                        ? 'bg-gradient-to-br from-purple-500 to-pink-600 text-white shadow-lg'
+                        : isToday
+                        ? 'bg-blue-100 text-blue-700 font-semibold'
+                        : 'hover:bg-purple-50 text-gray-700'
+                    }`}
+                  >
+                    <span>{day}</span>
+                    {dayAppointments.length > 0 && (
+                      <div className="absolute bottom-1 flex gap-0.5">
+                        {Array.from({ length: Math.min(dayAppointments.length, 3) }).map((_, i) => (
+                          <div
+                            key={i}
+                            className={`w-1 h-1 rounded-full ${
+                              isSelected ? 'bg-white' : 'bg-purple-500'
+                            }`}
+                          />
+                        ))}
+                      </div>
+                    )}
+                  </motion.button>
+                );
+              })}
+            </div>
           </motion.div>
         </div>
 
-        {/* RIGHT SIDE - Daily Schedule */}
-        <div className="lg:col-span-8">
+        {/* PLANNING - DROITE (9 colonnes - plus large) */}
+        <div className="md:col-span-9 lg:col-span-9">
           <motion.div
-            initial={{ opacity: 0, x: 50 }}
+            initial={{ opacity: 0, x: 20 }}
             animate={{ opacity: 1, x: 0 }}
-            className="space-y-3"
+            className="space-y-4"
           >
-            {/* Schedule Header */}
-            <div className="bg-gradient-to-r from-blue-500 to-purple-600 rounded-2xl p-4 text-white shadow-md">
-              <h3 className="text-lg font-semibold mb-0.5">
-                {t('Planning_of')}
-        {' '}
-        {/* On passe directement la variable 'language' ici */}
-        {selectedDate.toLocaleDateString(language, { 
-          day: 'numeric', 
-          month: 'long', 
-          year: 'numeric' 
-        })}
-              </h3>
-              <p className="text-blue-100 text-sm">
-                {appointments.filter((apt) => apt.date === selectedDate.toISOString().split('T')[0]).length} {t('rendez-vous_programmés')}
-              </p>
+            {/* Header du planning */}
+            <div className="bg-gradient-to-r from-purple-500 to-pink-600 rounded-2xl p-6 text-white shadow-xl">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="text-2xl font-bold mb-1">
+                    {selectedDate.toLocaleDateString('fr-FR', { 
+                      weekday: 'long', 
+                      day: 'numeric', 
+                      month: 'long', 
+                      year: 'numeric' 
+                    })}
+                  </h3>
+                  <p className="text-purple-100 text-lg">
+                    {todayAppointments.length} rendez-vous programmé{todayAppointments.length > 1 ? 's' : ''}
+                  </p>
+                </div>
+                <div className="bg-white/20 backdrop-blur-sm rounded-xl p-4">
+                  <Calendar className="w-10 h-10" />
+                </div>
+              </div>
             </div>
 
-            {/* Timeline Schedule */}
-            <div className="space-y-2.5">
-              {(() => {
-                const dateStr = selectedDate.toISOString().split('T')[0];
-                const dayAppointments = appointments
-                  .filter((apt) => apt.date === dateStr)
-                  .sort((a, b) => a.time.localeCompare(b.time));
-
-                // Si aucun rendez-vous, afficher un message
-                if (dayAppointments.length === 0) {
-                  return (
+            {/* Liste des rendez-vous */}
+            <div className="bg-white rounded-2xl shadow-xl p-6 min-h-[500px]">
+              {todayAppointments.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-20 text-gray-400">
+                  <div className="bg-gradient-to-br from-gray-100 to-gray-200 rounded-full p-8 mb-6">
+                    <Calendar className="w-20 h-20" />
+                  </div>
+                  <p className="text-xl font-semibold mb-2">Aucun rendez-vous prévu</p>
+                  <p className="text-sm">Sélectionnez un autre jour ou créez un rendez-vous</p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {todayAppointments.map((apt) => (
                     <motion.div
-                      initial={{ opacity: 0, y: 20 }}
+                      key={apt.id}
+                      initial={{ opacity: 0, y: 10 }}
                       animate={{ opacity: 1, y: 0 }}
-                      className="bg-white border-2 border-dashed border-gray-300 rounded-2xl p-8 text-center"
+                      whileHover={{ scale: 1.02 }}
+                      className={`relative p-6 rounded-2xl border-2 transition-all shadow-md hover:shadow-xl ${
+                        apt.status === 'completed'
+                          ? 'border-green-300 bg-gradient-to-r from-green-50 to-emerald-50'
+                          : 'border-purple-300 bg-gradient-to-r from-purple-50 to-pink-50 hover:border-purple-500'
+                      }`}
                     >
-                      <div className="w-14 h-14 mx-auto mb-3 bg-gray-100 rounded-full flex items-center justify-center">
-                        <Calendar className="w-7 h-7 text-gray-400" />
-                      </div>
-                      <h4 className="text-sm text-gray-700 mb-1">{t('no_appointments')}</h4>
-                      <p className="text-gray-500 text-xs">{t('click_new_appointment_to_add')}</p>
-                    </motion.div>
-                  );
-                }
-
-                // Afficher tous les rendez-vous de la journée
-                return dayAppointments.map((appointment, index) => (
-                  <motion.div
-                    key={appointment.id}
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: index * 0.05 }}
-                    whileHover={{ y: -2 }}
-                    className={`group relative rounded-xl transition-all overflow-hidden bg-white border-l-4 shadow-sm hover:shadow-md ${
-                      appointment.isConfirmed
-                        ? 'border-l-green-500'
-                        : 'border-l-gray-400'
-                    }`}
-                  >
-                    {/* Decorative line */}
-                    <div className={`absolute left-0 top-0 bottom-0 w-1 ${
-                      appointment.isConfirmed ? 'bg-green-500' : 'bg-gray-400'
-                    }`} />
-
-                    {/* Time indicator */}
-                    <div className={`absolute left-1 top-0 bottom-0 w-20 flex flex-col items-center justify-center border-r border-gray-200 ${
-                      appointment.isConfirmed ? 'bg-green-50' : 'bg-gray-50'
-                    }`}>
-                      <Clock className={`w-4 h-4 mb-1 ${
-                        appointment.isConfirmed ? 'text-green-600' : 'text-gray-600'
-                      }`} />
-                      <p className={`text-sm font-bold ${
-                        appointment.isConfirmed ? 'text-green-900' : 'text-gray-900'
-                      }`}>{appointment.time}</p>
-                      {appointment.isConfirmed && (
-                        <div className="mt-1 w-5 h-5 bg-green-500 rounded-full flex items-center justify-center">
-                          <Check className="w-3 h-3 text-white" />
-                        </div>
-                      )}
-                      {!appointment.isConfirmed && (
-                        <div className="mt-1 px-1.5 py-0.5 bg-gray-300 text-gray-700 text-[10px] rounded-full font-semibold">
-                          Attente
-                        </div>
-                      )}
-                    </div>
-
-                    <div className="ml-20 p-3">
-                      <div className="flex items-center justify-between gap-3">
-                        <div className="flex items-center gap-3 flex-1">
-                          {/* Patient Avatar */}
-                          <motion.div 
-                            className="w-10 h-10 bg-gradient-to-r from-blue-500 to-purple-600 rounded-lg flex items-center justify-center text-white font-bold shadow-md"
-                            whileHover={{ rotate: 360 }}
-                            transition={{ duration: 0.6, type: "spring" }}
-                          >
-                            {appointment.patientName[0]}
-                          </motion.div>
-
-                          {/* Patient Info with enhanced typography */}
-                          <div className="flex-1">
-                            <div className="flex items-center gap-1.5 mb-1">
-                              <h4 className="text-sm text-gray-900 font-semibold">{appointment.patientName}</h4>
-                              {appointment.isNewPatient && (
-                                <span className="px-2 py-0.5 bg-blue-100 text-blue-700 text-[10px] rounded-full font-semibold">
-                                  Nouveau
-                                </span>
-                              )}
-                            </div>
-                            <p className="text-xs text-gray-600 mb-1">
-                              {appointment.patientPhone}
-                            </p>
-                            {appointment.profession && (
-                              <p className="text-[10px] text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded inline-flex items-center gap-1">
-                                <Briefcase className="w-2.5 h-2.5" />
-                                {appointment.profession}
-                              </p>
-                            )}
-                          </div>
-
-                          {/* Type Badge */}
-                          <div className="flex flex-col gap-1.5 items-end">
-                            <span className={`px-3 py-1 rounded-lg text-[10px] font-semibold ${
-                              appointment.type === 'consultation'
-                                ? 'bg-blue-100 text-blue-700'
-                                : 'bg-green-100 text-green-700'
+                      <div className="flex items-start justify-between gap-4">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-4 mb-4">
+                            <div className={`p-3 rounded-xl shadow-md ${
+                              apt.status === 'completed' 
+                                ? 'bg-gradient-to-br from-green-400 to-green-600' 
+                                : 'bg-gradient-to-br from-purple-500 to-pink-600'
                             }`}>
-                              {appointment.type === 'consultation' ? 'Consultation' : 'Contrôle'}
+                              <Clock className="w-6 h-6 text-white" />
+                            </div>
+                            <span className="text-xl font-bold text-gray-900">
+                              {apt.time}
                             </span>
-                            {appointment.isConfirmed && appointment.amountPaid !== undefined && (
-                              <span className="px-2.5 py-1 bg-green-100 text-green-700 text-xs rounded-lg font-semibold">
-                                {appointment.amountPaid} DT
+                            {apt.notes && apt.notes.includes('🆕') && (
+                              <span className="px-4 py-1.5 bg-gradient-to-r from-blue-500 to-cyan-600 text-white text-sm rounded-full font-semibold shadow-md">
+                                🆕 Nouveau patient
+                              </span>
+                            )}
+                            {apt.status === 'completed' && (
+                              <span className="px-4 py-1.5 bg-gradient-to-r from-green-500 to-emerald-600 text-white text-sm rounded-full font-semibold flex items-center gap-2 shadow-md">
+                                <Check className="w-4 h-4" />
+                                Confirmé
                               </span>
                             )}
                           </div>
+                          
+                          <div className="space-y-3 ml-16">
+                            <div className="flex items-center gap-3 text-gray-800">
+                              <User className="w-5 h-5 text-purple-500" />
+                              <span className="text-lg font-semibold">{apt.patient_name}</span>
+                            </div>
+                            {apt.patient_phone && (
+                              <div className="flex items-center gap-3 text-gray-600">
+                                <Phone className="w-5 h-5 text-purple-400" />
+                                <span className="text-base">{apt.patient_phone}</span>
+                              </div>
+                            )}
+                          </div>
                         </div>
 
-                        {/* Action Buttons */}
-                        <div className="flex items-center gap-1.5">
-                          {!appointment.isConfirmed && (
-                            <motion.button
-                              whileHover={{ scale: 1.05 }}
-                              whileTap={{ scale: 0.95 }}
-                              onClick={() => setShowConfirmDialog(appointment)}
-                              className="p-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
-                              title={t('confirm')}
-                            >
-                              <Check className="w-4 h-4" />
-                            </motion.button>
+                        {/* Actions */}
+                        <div className="flex gap-2">
+                          {apt.status !== 'completed' && (
+                            <>
+                              <motion.button
+                                whileHover={{ scale: 1.15 }}
+                                whileTap={{ scale: 0.9 }}
+                                onClick={() => handleEditClick(apt)}
+                                className="p-3 bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 rounded-xl transition-all shadow-md"
+                                title="Modifier"
+                              >
+                                <Edit className="w-5 h-5 text-white" />
+                              </motion.button>
+                              <motion.button
+                                whileHover={{ scale: 1.15 }}
+                                whileTap={{ scale: 0.9 }}
+                                onClick={async () => {
+                                  try {
+                                    const { data: patientData } = await supabase
+                                      .from('patients')
+                                      .select('pays')
+                                      .eq('id', apt.patient_id)
+                                      .single();
+                                    
+                                    setShowConfirmDialog({
+                                      ...apt,
+                                      pays: patientData?.pays || undefined
+                                    });
+                                  } catch (error) {
+                                    console.error('Erreur récupération pays:', error);
+                                    setShowConfirmDialog(apt);
+                                  }
+                                }}
+                                className="p-3 bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 rounded-xl transition-all shadow-md"
+                                title="Confirmer"
+                              >
+                                <Check className="w-5 h-5 text-white" />
+                              </motion.button>
+                            </>
                           )}
                           <motion.button
-                            whileHover={{ scale: 1.05 }}
-                            whileTap={{ scale: 0.95 }}
-                            onClick={() => handleEditAppointment(appointment)}
-                            className="p-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-                            title="Modifier"
-                          >
-                            <Edit className="w-4 h-4" />
-                          </motion.button>
-                          <motion.button
-                            whileHover={{ scale: 1.05 }}
-                            whileTap={{ scale: 0.95 }}
-                            onClick={() => handleDeleteAppointment(appointment)}
-                            className="p-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+                            whileHover={{ scale: 1.15 }}
+                            whileTap={{ scale: 0.9 }}
+                            onClick={() => setShowDeleteDialog(apt)}
+                            className="p-3 bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 rounded-xl transition-all shadow-md"
                             title="Supprimer"
                           >
-                            <Trash2 className="w-4 h-4" />
+                            <Trash2 className="w-5 h-5 text-white" />
                           </motion.button>
                         </div>
                       </div>
-                    </div>
-                  </motion.div>
-                ));
-              })()}
+                    </motion.div>
+                  ))}
+                </div>
+              )}
             </div>
           </motion.div>
         </div>
       </div>
 
-      {/* Add/Edit appointment modal */}
+      {/* Modal Création Rendez-vous */}
       <AnimatePresence>
         {showAddAppointment && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            onClick={() => {
-              setShowAddAppointment(false);
-              setEditingAppointment(null);
-            }}
-            className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50"
+            onClick={() => !processing && setShowAddAppointment(false)}
+            className="fixed inset-0 bg-black/70 backdrop-blur-md flex items-center justify-center z-50 p-4"
           >
             <motion.div
-              initial={{ scale: 0.8, opacity: 0, y: 50 }}
+              initial={{ scale: 0.9, opacity: 0, y: 20 }}
               animate={{ scale: 1, opacity: 1, y: 0 }}
-              exit={{ scale: 0.8, opacity: 0, y: 50 }}
-              transition={{ type: "spring", duration: 0.5 }}
+              exit={{ scale: 0.9, opacity: 0, y: 20 }}
               onClick={(e) => e.stopPropagation()}
-              className="bg-white rounded-3xl p-8 max-w-2xl w-full shadow-2xl max-h-[90vh] overflow-y-auto custom-scrollbar"
-              style={{
-                background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
-                boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25), 0 0 80px rgba(59, 130, 246, 0.1)',
-              }}
+              className="bg-white rounded-3xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto"
             >
-              <div className="flex items-center justify-between mb-6">
-                <h3 className="text-gray-900">
-                  {editingAppointment ? t('edit') + ' ' + t('appointments').toLowerCase() : t('new_appointment')}
-                </h3>
-                <motion.button
-                  whileHover={{ scale: 1.1, rotate: 90 }}
-                  whileTap={{ scale: 0.9 }}
-                  onClick={() => {
-                    setShowAddAppointment(false);
-                    setEditingAppointment(null);
-                  }}
-                  className="p-2 hover:bg-gray-100 rounded-xl transition-colors"
-                >
-                  <X className="w-5 h-5 text-gray-500" />
-                </motion.button>
+              <div className="sticky top-0 bg-gradient-to-r from-purple-600 to-pink-600 text-white p-6 rounded-t-3xl z-10 shadow-lg">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-2xl font-bold">Nouveau Rendez-vous</h3>
+                  <motion.button
+                    whileHover={{ scale: 1.1, rotate: 90 }}
+                    whileTap={{ scale: 0.9 }}
+                    onClick={() => setShowAddAppointment(false)}
+                    disabled={processing}
+                    className="p-2 hover:bg-white/20 rounded-xl transition-colors"
+                  >
+                    <X className="w-6 h-6" />
+                  </motion.button>
+                </div>
               </div>
 
-              <div className="space-y-6">
-                {/* Patient Name */}
+              <div className="p-6 space-y-5">
+                {/* Nom du patient */}
                 <div>
-                  <label className="block text-sm text-gray-700 mb-2">{t('patient_name')}</label>
+                  {/* Résultats de recherche - AU-DESSUS DU LABEL */}
+                  {showSearchResults && searchResults.length > 0 && (
+                    <div className="mb-2 bg-white border-2 border-purple-200 rounded-xl shadow-2xl max-h-60 overflow-y-auto">
+                      <div className="p-3 bg-purple-50 border-b-2 border-purple-100 text-sm font-medium text-purple-700">
+                        ✨ {searchResults.length} patient{searchResults.length > 1 ? 's' : ''} trouvé{searchResults.length > 1 ? 's' : ''}
+                      </div>
+                      {searchResults.map((patient) => (
+                        <button
+                          key={patient.id}
+                          onClick={() => selectPatient(patient)}
+                          className="w-full text-left px-4 py-3 hover:bg-purple-50 border-b last:border-b-0 transition-colors"
+                        >
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <p className="font-semibold text-gray-900">{patient.name}</p>
+                              <p className="text-sm text-gray-600">{patient.phone}</p>
+                              {patient.age && (
+                                <p className="text-xs text-gray-500 mt-1">{patient.age} ans</p>
+                              )}
+                            </div>
+                            <div className="px-3 py-1 bg-green-100 text-green-700 text-xs font-medium rounded-full">
+                              Existant
+                            </div>
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                  
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    Nom du patient <span className="text-red-500">*</span>
+                  </label>
                   <div className="relative">
-                    <User className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                    <div className="absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none">
+                      <User className="w-5 h-5 text-purple-400" />
+                    </div>
                     <input
                       type="text"
                       value={newAppointment.patientName}
-                      onChange={(e) =>
-                        setNewAppointment({ ...newAppointment, patientName: e.target.value })
-                      }
-                      className="w-full pl-12 pr-4 py-3 border-2 border-gray-200 rounded-xl focus:border-blue-500 focus:outline-none transition-all"
-                      placeholder="Mohamed Gharbi"
+                      onChange={(e) => {
+                        setNewAppointment({ ...newAppointment, patientName: e.target.value });
+                        handlePatientSearch(e.target.value, 'name');
+                      }}
+                      onFocus={() => {
+                        if (newAppointment.patientName.length >= 2 && searchResults.length > 0) {
+                          setShowSearchResults(true);
+                        }
+                      }}
+                      className="w-full pl-12 pr-4 py-3 border-2 border-gray-300 rounded-2xl focus:border-purple-500 focus:ring-4 focus:ring-purple-100 transition-all outline-none shadow-sm"
+                      placeholder="Ex: Mohamed Gharbi"
                     />
                   </div>
                 </div>
 
-                {/* Phone */}
-                <div>
-                  <label className="block text-sm text-gray-700 mb-2">{t('patient_phone')}</label>
-                  <input
-                    type="tel"
-                    value={newAppointment.patientPhone}
-                    onChange={(e) =>
-                      setNewAppointment({ ...newAppointment, patientPhone: e.target.value })
-                    }
-                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-blue-500 focus:outline-none transition-all"
-                    placeholder="+216 98 123 456"
-                  />
-                </div>
-
-                {/* Type de consultation - Visual Selection */}
-                <div>
-                  <label className="block text-sm text-gray-700 mb-3">Type de consultation</label>
-                  <div className="grid grid-cols-2 gap-3">
-                    <motion.button
-                      type="button"
-                      whileHover={{ scale: 1.02 }}
-                      whileTap={{ scale: 0.98 }}
-                      onClick={() => setNewAppointment({ ...newAppointment, type: 'consultation' })}
-                      className={`p-4 rounded-xl border-2 transition-all ${
-                        newAppointment.type === 'consultation'
-                          ? 'border-blue-500 bg-blue-50 shadow-lg shadow-blue-100'
-                          : 'border-gray-200 hover:border-gray-300'
-                      }`}
-                    >
-                      <div className={`w-10 h-10 mx-auto mb-2 rounded-lg flex items-center justify-center ${
-                        newAppointment.type === 'consultation'
-                          ? 'bg-blue-500 text-white'
-                          : 'bg-gray-100 text-gray-400'
-                      }`}>
-                        <FileText className="w-5 h-5" />
-                      </div>
-                      <p className={`text-sm font-medium ${
-                        newAppointment.type === 'consultation' ? 'text-blue-700' : 'text-gray-600'
-                      }`}>
-                        Consultation
-                      </p>
-                    </motion.button>
-
-                    <motion.button
-                      type="button"
-                      whileHover={{ scale: 1.02 }}
-                      whileTap={{ scale: 0.98 }}
-                      onClick={() => setNewAppointment({ ...newAppointment, type: 'control' })}
-                      className={`p-4 rounded-xl border-2 transition-all ${
-                        newAppointment.type === 'control'
-                          ? 'border-green-500 bg-green-50 shadow-lg shadow-green-100'
-                          : 'border-gray-200 hover:border-gray-300'
-                      }`}
-                    >
-                      <div className={`w-10 h-10 mx-auto mb-2 rounded-lg flex items-center justify-center ${
-                        newAppointment.type === 'control'
-                          ? 'bg-green-500 text-white'
-                          : 'bg-gray-100 text-gray-400'
-                      }`}>
-                        <Check className="w-5 h-5" />
-                      </div>
-                      <p className={`text-sm font-medium ${
-                        newAppointment.type === 'control' ? 'text-green-700' : 'text-gray-600'
-                      }`}>
-                        Contrôle
-                      </p>
-                    </motion.button>
+                {/* Téléphone */}
+                <div className="relative">
+                  <label className="block text-sm font-semibold text-gray-700 mb-3">
+                    Téléphone <span className="text-red-500">*</span>
+                  </label>
+                  <div className="relative">
+                    <div className="absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none">
+                      <Phone className="w-5 h-5 text-purple-400" />
+                    </div>
+                    <input
+                      type="tel"
+                      value={newAppointment.patientPhone}
+                      onChange={(e) => {
+                        setNewAppointment({ ...newAppointment, patientPhone: e.target.value });
+                        handlePatientSearch(e.target.value, 'phone');
+                      }}
+                      className="w-full pl-12 pr-4 py-3 border-2 border-gray-300 rounded-2xl focus:border-purple-500 focus:ring-4 focus:ring-purple-100 transition-all outline-none shadow-sm"
+                      placeholder="+216 98 123 456"
+                    />
                   </div>
+                  <p className="text-xs text-gray-500 mt-2 flex items-center gap-1">
+                    💡 Le système détecte automatiquement si c'est un nouveau patient
+                  </p>
                 </div>
 
-                {/* Time Selection - Hours and Minutes */}
+                {/* Heure - Sélecteur moderne Heures & Minutes */}
                 <div>
-                  <label className="block text-sm text-gray-700 mb-3">Heure du rendez-vous</label>
-                  <div className="flex items-center gap-3">
+                  <label className="block text-sm font-semibold text-gray-700 mb-3">
+                    Heure du rendez-vous <span className="text-red-500">*</span>
+                  </label>
+                  <div className="flex gap-4">
+                    {/* Heures */}
                     <div className="flex-1">
-                      <label className="block text-xs text-gray-500 mb-2">Heures</label>
-                      <select
-                        value={newAppointment.time.split(':')[0] || '09'}
-                        onChange={(e) => {
-                          const minutes = newAppointment.time.split(':')[1] || '00';
-                          setNewAppointment({ ...newAppointment, time: `${e.target.value}:${minutes}` });
-                        }}
-                        className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-blue-500 focus:outline-none transition-all appearance-none bg-white cursor-pointer"
-                      >
-                        {Array.from({ length: 13 }, (_, i) => i + 8).map((hour) => (
-                          <option key={hour} value={hour.toString().padStart(2, '0')}>
-                            {hour.toString().padStart(2, '0')}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-
-                    <div className="text-2xl text-gray-400 mt-6">:</div>
-
-                    <div className="flex-1">
-                      <label className="block text-xs text-gray-500 mb-2">Minutes</label>
-                      <select
-                        value={newAppointment.time.split(':')[1] || '00'}
-                        onChange={(e) => {
-                          const hours = newAppointment.time.split(':')[0] || '09';
-                          setNewAppointment({ ...newAppointment, time: `${hours}:${e.target.value}` });
-                        }}
-                        className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-blue-500 focus:outline-none transition-all appearance-none bg-white cursor-pointer"
-                      >
-                        {Array.from({ length: 60 }, (_, i) => i).map((minute) => (
-                          <option key={minute} value={minute.toString().padStart(2, '0')}>
-                            {minute.toString().padStart(2, '0')}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-
-                    <div className="mt-6">
-                      <div className="p-3 bg-gradient-to-br from-blue-50 to-purple-50 rounded-xl">
-                        <Clock className="w-6 h-6 text-blue-500" />
+                      <div className="relative">
+                        <div className="absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none z-10">
+                          <Clock className="w-5 h-5 text-purple-400" />
+                        </div>
+                        <select
+                          value={newAppointment.hour}
+                          onChange={(e) => setNewAppointment({ ...newAppointment, hour: e.target.value })}
+                          className="w-full pl-12 pr-4 py-3 font-semibold border-2 border-gray-300 rounded-2xl focus:border-purple-500 focus:ring-4 focus:ring-purple-100 transition-all outline-none appearance-none bg-white cursor-pointer shadow-sm"
+                        >
+                          {hours.map((h) => (
+                            <option key={h} value={h}>
+                              {h}h
+                            </option>
+                          ))}
+                        </select>
+                        <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-gray-400 text-sm font-medium">
+                          
+                        </div>
                       </div>
                     </div>
+
+                    {/* Minutes */}
+                    <div className="flex-1">
+                      <div className="relative">
+                        <select
+                          value={newAppointment.minute}
+                          onChange={(e) => setNewAppointment({ ...newAppointment, minute: e.target.value })}
+                          className="w-full pl-4 pr-4 py-3 font-semibold border-2 border-gray-300 rounded-2xl focus:border-purple-500 focus:ring-4 focus:ring-purple-100 transition-all outline-none appearance-none bg-white cursor-pointer shadow-sm"
+                        >
+                          {minutes.map((m) => (
+                            <option key={m} value={m}>
+                              {m} min
+                            </option>
+                          ))}
+                        </select>
+                        <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-gray-400 text-sm font-medium">
+                         
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="mt-3 p-3 bg-purple-50 rounded-xl border border-purple-200">
+                    <p className="text-center text-purple-900 font-bold text-xl">
+                      🕐 {newAppointment.hour}:{newAppointment.minute}
+                    </p>
                   </div>
                 </div>
 
                 {/* Date de naissance */}
-                <motion.div
-                  initial={{ opacity: 0, x: -20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: 0.2 }}
-                >
-                  <label className="block text-sm text-gray-700 mb-2 flex items-center gap-2">
-                    <Calendar className="w-4 h-4 text-blue-500" />
-                    {t('birth_date')}
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-3">
+                    Date de naissance
                   </label>
-                  
-                  <div className="grid grid-cols-3 gap-2">
-                    {/* Jour */}
-                    <motion.div
-                      whileHover={{ scale: 1.02 }}
-                      className="relative group"
-                    >
-                      <div className="relative">
-                        {/* Gradient glow effect */}
-                        <div className="absolute inset-0 bg-gradient-to-r from-blue-500 to-purple-500 rounded-lg opacity-0 group-hover:opacity-20 group-focus-within:opacity-30 blur transition-all duration-300" />
-                        
-                        <select
-                          value={newAppointment.birthDate.split('-')[2] || ''}
-                          onChange={(e) => {
-                            const [year, month] = newAppointment.birthDate.split('-');
-                            setNewAppointment({ 
-                              ...newAppointment, 
-                              birthDate: `${year || '2000'}-${month || '01'}-${e.target.value.padStart(2, '0')}` 
-                            });
-                          }}
-                          className="relative w-full px-3 py-2.5 border-2 border-gray-200 rounded-lg focus:border-blue-500 focus:outline-none transition-all appearance-none bg-white cursor-pointer hover:border-blue-300 font-medium text-gray-700 text-center group-hover:shadow-lg"
-                        >
-                          <option value="">Jour</option>
-                          {Array.from({ length: 31 }, (_, i) => i + 1).map((day) => (
-                            <option key={day} value={day.toString().padStart(2, '0')}>
-                              {day.toString().padStart(2, '0')}
-                            </option>
-                          ))}
-                        </select>
-                        
-                        {/* Custom arrow with animation */}
-                        <div className="absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none">
-                          <motion.div
-                            animate={{ y: [0, 2, 0] }}
-                            transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
-                          >
-                            <svg className="w-4 h-4 text-blue-500 group-hover:text-blue-600 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M19 9l-7 7-7-7" />
-                            </svg>
-                          </motion.div>
-                        </div>
-
-                        {/* Top label badge */}
-                        <div className="absolute -top-2 left-2 px-2 py-0.5 bg-gradient-to-r from-blue-500 to-blue-600 text-white text-xs rounded-full opacity-0 group-focus-within:opacity-100 transition-opacity shadow-lg">
-                          J
-                        </div>
-                      </div>
-                    </motion.div>
-
-                    {/* Mois */}
-                    <motion.div
-                      whileHover={{ scale: 1.02 }}
-                      className="relative group"
-                    >
-                      <div className="relative">
-                        {/* Gradient glow effect */}
-                        <div className="absolute inset-0 bg-gradient-to-r from-purple-500 to-pink-500 rounded-lg opacity-0 group-hover:opacity-20 group-focus-within:opacity-30 blur transition-all duration-300" />
-                        
-                        <select
-                          value={newAppointment.birthDate.split('-')[1] || ''}
-                          onChange={(e) => {
-                            const [year, , day] = newAppointment.birthDate.split('-');
-                            setNewAppointment({ 
-                              ...newAppointment, 
-                              birthDate: `${year || '2000'}-${e.target.value.padStart(2, '0')}-${day || '01'}` 
-                            });
-                          }}
-                          className="relative w-full px-3 py-2.5 border-2 border-gray-200 rounded-lg focus:border-purple-500 focus:outline-none transition-all appearance-none bg-white cursor-pointer hover:border-purple-300 font-medium text-gray-700 text-center group-hover:shadow-lg"
-                        >
-                          <option value="">Mois</option>
-                          {[
-                            'Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Juin',
-                            'Juil', 'Aoû', 'Sep', 'Oct', 'Nov', 'Déc'
-                          ].map((month, index) => (
-                            <option key={index} value={(index + 1).toString().padStart(2, '0')}>
-                              {month}
-                            </option>
-                          ))}
-                        </select>
-                        
-                        {/* Custom arrow with animation */}
-                        <div className="absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none">
-                          <motion.div
-                            animate={{ y: [0, 2, 0] }}
-                            transition={{ duration: 2, repeat: Infinity, ease: "easeInOut", delay: 0.3 }}
-                          >
-                            <svg className="w-4 h-4 text-purple-500 group-hover:text-purple-600 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M19 9l-7 7-7-7" />
-                            </svg>
-                          </motion.div>
-                        </div>
-
-                        {/* Top label badge */}
-                        <div className="absolute -top-2 left-2 px-2 py-0.5 bg-gradient-to-r from-purple-500 to-purple-600 text-white text-xs rounded-full opacity-0 group-focus-within:opacity-100 transition-opacity shadow-lg">
-                          M
-                        </div>
-                      </div>
-                    </motion.div>
-
-                    {/* Année */}
-                    <motion.div
-                      whileHover={{ scale: 1.02 }}
-                      className="relative group"
-                    >
-                      <div className="relative">
-                        {/* Gradient glow effect */}
-                        <div className="absolute inset-0 bg-gradient-to-r from-pink-500 to-rose-500 rounded-lg opacity-0 group-hover:opacity-20 group-focus-within:opacity-30 blur transition-all duration-300" />
-                        
-                        <select
-                          value={newAppointment.birthDate.split('-')[0] || ''}
-                          onChange={(e) => {
-                            const [, month, day] = newAppointment.birthDate.split('-');
-                            setNewAppointment({ 
-                              ...newAppointment, 
-                              birthDate: `${e.target.value}-${month || '01'}-${day || '01'}` 
-                            });
-                          }}
-                          className="relative w-full px-3 py-2.5 border-2 border-gray-200 rounded-lg focus:border-pink-500 focus:outline-none transition-all appearance-none bg-white cursor-pointer hover:border-pink-300 font-medium text-gray-700 text-center group-hover:shadow-lg"
-                        >
-                          <option value="">Année</option>
-                          {Array.from({ length: 100 }, (_, i) => new Date().getFullYear() - i).map((year) => (
-                            <option key={year} value={year}>
-                              {year}
-                            </option>
-                          ))}
-                        </select>
-                        
-                        {/* Custom arrow with animation */}
-                        <div className="absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none">
-                          <motion.div
-                            animate={{ y: [0, 2, 0] }}
-                            transition={{ duration: 2, repeat: Infinity, ease: "easeInOut", delay: 0.6 }}
-                          >
-                            <svg className="w-4 h-4 text-pink-500 group-hover:text-pink-600 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M19 9l-7 7-7-7" />
-                            </svg>
-                          </motion.div>
-                        </div>
-
-                        {/* Top label badge */}
-                        <div className="absolute -top-2 left-2 px-2 py-0.5 bg-gradient-to-r from-pink-500 to-pink-600 text-white text-xs rounded-full opacity-0 group-focus-within:opacity-100 transition-opacity shadow-lg">
-                          A
-                        </div>
-                      </div>
-                    </motion.div>
+                  <div className="relative">
+                    <div className="absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none z-10">
+                      <Calendar className="w-5 h-5 text-purple-400" />
+                    </div>
+                    <input
+                      type="date"
+                      value={newAppointment.birthDate}
+                      onChange={(e) => setNewAppointment({ ...newAppointment, birthDate: e.target.value })}
+                      className="w-full pl-12 pr-4 py-3 border-2 border-gray-300 rounded-2xl focus:border-purple-500 focus:ring-4 focus:ring-purple-100 transition-all outline-none shadow-sm"
+                    />
                   </div>
-                  
-                  {/* Date preview - More compact */}
-                  {newAppointment.birthDate && newAppointment.birthDate.split('-').every(part => part && part !== '2000' && part !== '01') && (
-                    <motion.div
-                      initial={{ opacity: 0, height: 0 }}
-                      animate={{ opacity: 1, height: 'auto' }}
-                      className="mt-2 flex items-center justify-center gap-2 px-3 py-2 bg-gradient-to-r from-blue-50 via-purple-50 to-pink-50 rounded-lg border border-blue-200/50"
-                    >
-                      <motion.div 
-                        className="w-1.5 h-1.5 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full"
-                        animate={{ scale: [1, 1.3, 1] }}
-                        transition={{ duration: 2, repeat: Infinity }}
-                      />
-                      <p className="text-xs font-medium text-gray-700">
-                        {new Date(newAppointment.birthDate).toLocaleDateString('fr-FR', { 
-                          day: 'numeric', 
-                          month: 'long', 
-                          year: 'numeric' 
-                        })}
-                      </p>
-                    </motion.div>
-                  )}
-                </motion.div>
+                </div>
 
                 {/* Profession */}
-                <motion.div
-                  initial={{ opacity: 0, x: -20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: 0.25 }}
-                >
-                  <label className="block text-sm text-gray-700 mb-2 flex items-center gap-2">
-                    <Briefcase className="w-4 h-4 text-green-500" />
-                    {t('profession')}
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-3">
+                    Profession
                   </label>
-                  <motion.div 
-                    className="relative group"
-                    whileHover={{ scale: 1.01 }}
-                  >
-                    {/* Gradient glow effect */}
-                    <div className="absolute inset-0 bg-gradient-to-r from-green-500 via-teal-500 to-emerald-500 rounded-xl opacity-0 group-hover:opacity-20 group-focus-within:opacity-30 blur transition-all duration-300" />
-                    
-                    <div className="relative">
-                      <div className="absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none z-10">
-                        <motion.div
-                          animate={{ 
-                            rotate: newAppointment.profession ? [0, 10, -10, 0] : 0,
-                          }}
-                          transition={{ duration: 0.6, ease: "easeInOut" }}
-                        >
-                          <Briefcase className="w-5 h-5 text-green-500 group-hover:text-green-600 transition-colors" />
-                        </motion.div>
-                      </div>
-                      
-                      <select
-                        value={newAppointment.profession}
-                        onChange={(e) => setNewAppointment({ ...newAppointment, profession: e.target.value })}
-                        className="relative w-full pl-12 pr-12 py-3.5 border-2 border-gray-200 rounded-xl focus:border-green-500 focus:outline-none transition-all appearance-none bg-white cursor-pointer hover:border-green-300 hover:shadow-lg font-medium text-gray-700 group-hover:bg-gradient-to-br group-hover:from-white group-hover:to-green-50"
-                        required
-                      >
-                        <option value="">💼 Sélectionner une profession</option>
-                        <optgroup label="🏥 Secteur Médical & Santé">
-                          <option value="Médecin">⚕️  Médecin</option>
-                          <option value="Infirmier">💉 Infirmier(ère)</option>
-                          <option value="Pharmacien">💊 Pharmacien(ne)</option>
-                          <option value="Dentiste">🦷 Dentiste</option>
-                          <option value="Kinésithérapeute">🤸 Kinésithérapeute</option>
-                        </optgroup>
-                        <optgroup label="🎓 Éducation & Formation">
-                          <option value="Enseignant">📚 Enseignant(e)</option>
-                          <option value="Professeur">👨‍🏫 Professeur(e)</option>
-                          <option value="Étudiant">🎓 Étudiant(e)</option>
-                          <option value="Chercheur">🔬 Chercheur(se)</option>
-                        </optgroup>
-                        <optgroup label="⚙️ Ingénierie & Technique">
-                          <option value="Ingénieur">⚙️  Ingénieur(e)</option>
-                          <option value="Technicien">🔧 Technicien(ne)</option>
-                          <option value="Informaticien">💻 Informaticien(ne)</option>
-                          <option value="Architecte">📐 Architecte</option>
-                        </optgroup>
-                        <optgroup label="⚖️ Juridique & Administration">
-                          <option value="Avocat">⚖️  Avocat(e)</option>
-                          <option value="Fonctionnaire">🏛️  Fonctionnaire</option>
-                          <option value="Notaire">📜 Notaire</option>
-                          <option value="Comptable">📊 Comptable</option>
-                        </optgroup>
-                        <optgroup label="🏪 Commerce & Affaires">
-                          <option value="Commerçant">🏪 Commerçant(e)</option>
-                          <option value="Entrepreneur">💼 Entrepreneur(se)</option>
-                          <option value="Vendeur">🛍️  Vendeur(se)</option>
-                          <option value="Manager">👔 Manager</option>
-                        </optgroup>
-                        <optgroup label="🎨 Arts & Communication">
-                          <option value="Artiste">🎨 Artiste</option>
-                          <option value="Journaliste">📰 Journaliste</option>
-                          <option value="Designer">🖌️  Designer</option>
-                          <option value="Photographe">📸 Photographe</option>
-                        </optgroup>
-                        <optgroup label="🚗 Transport & Services">
-                          <option value="Chauffeur">🚗 Chauffeur(se)</option>
-                          <option value="Pilote">✈️  Pilote</option>
-                          <option value="Mécanicien">🔩 Mécanicien(ne)</option>
-                        </optgroup>
-                        <optgroup label="🌾 Agriculture & Industrie">
-                          <option value="Agriculteur">🌾 Agriculteur(trice)</option>
-                          <option value="Ouvrier">🏗️  Ouvrier(ère)</option>
-                        </optgroup>
-                        <optgroup label="📋 Autres Situations">
-                          <option value="Retraité">🏖️  Retraité(e)</option>
-                          <option value="Sans emploi">📋 Sans emploi</option>
-                          <option value="Autre">💼 Autre</option>
-                        </optgroup>
-                      </select>
-                      
-                      {/* Custom arrow with animation */}
-                      <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none">
-                        <motion.div
-                          animate={{ y: [0, 3, 0] }}
-                          transition={{ duration: 2, repeat: Infinity, ease: "easeInOut", delay: 0.2 }}
-                        >
-                          <svg className="w-5 h-5 text-green-500 group-hover:text-green-600 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M19 9l-7 7-7-7" />
-                          </svg>
-                        </motion.div>
-                      </div>
-
-                      {/* Top label badge */}
-                      {newAppointment.profession && (
-                        <motion.div 
-                          initial={{ opacity: 0, y: -10 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          className="absolute -top-2.5 left-3 px-2.5 py-0.5 bg-gradient-to-r from-green-500 to-emerald-600 text-white text-xs rounded-full shadow-lg"
-                        >
-                          Sélectionné
-                        </motion.div>
-                      )}
+                  <div className="relative">
+                    <div className="absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none">
+                      <Briefcase className="w-5 h-5 text-purple-400" />
                     </div>
-                  </motion.div>
-                </motion.div>
+                    <input
+                      type="text"
+                      value={newAppointment.profession}
+                      onChange={(e) => setNewAppointment({ ...newAppointment, profession: e.target.value })}
+                      className="w-full pl-12 pr-4 py-3 border-2 border-gray-300 rounded-2xl focus:border-purple-500 focus:ring-4 focus:ring-purple-100 transition-all outline-none shadow-sm"
+                      placeholder="Ex: Ingénieur, Enseignant..."
+                    />
+                  </div>
+                </div>
 
                 {/* Pays */}
-                <motion.div
-                  initial={{ opacity: 0, x: -20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: 0.3 }}
-                >
-                  <label className="block text-sm text-gray-700 mb-2 flex items-center gap-2">
-                    <Globe className="w-4 h-4 text-blue-500" />
-                    {t('country')}
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-3">
+                    Pays
                   </label>
-                  <motion.div 
-                    className="relative group"
-                    whileHover={{ scale: 1.01 }}
-                  >
-                    {/* Gradient glow effect */}
-                    <div className="absolute inset-0 bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 rounded-xl opacity-0 group-hover:opacity-20 group-focus-within:opacity-30 blur transition-all duration-300" />
-                    
-                    <div className="relative">
-                      <div className="absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none z-10">
-                        <motion.div
-                          animate={{ 
-                            rotate: newAppointment.pays ? [0, 360] : 0,
-                          }}
-                          transition={{ duration: 0.6, ease: "easeInOut" }}
-                        >
-                          <Globe className="w-5 h-5 text-blue-500 group-hover:text-blue-600 transition-colors" />
-                        </motion.div>
-                      </div>
-                      
-                      <select
-                        value={newAppointment.pays}
-                        onChange={(e) => {
-                          setNewAppointment({ ...newAppointment, pays: e.target.value, region: '' });
-                        }}
-                        className="relative w-full pl-12 pr-12 py-3.5 border-2 border-gray-200 rounded-xl focus:border-blue-500 focus:outline-none transition-all appearance-none bg-white cursor-pointer hover:border-blue-300 hover:shadow-lg font-medium text-gray-700 group-hover:bg-gradient-to-br group-hover:from-white group-hover:to-blue-50"
-                        required
-                      >
-                        <option value="">🌍 Sélectionner un pays</option>
-                        <optgroup label="🌍 Pays du Maghreb">
-                          <option value="Tunisie">🇹🇳 Tunisie - République Tunisienne</option>
-                          <option value="Libye">🇱🇾 Libye - État de Libye</option>
-                          <option value="Algérie">🇩🇿 Algérie - République Algérienne</option>
-                        </optgroup>
-                        <optgroup label="🌐 Autre Pays">
-                          <option value="Autre">🌍 Autre pays</option>
-                        </optgroup>
-                      </select>
-                      
-                      {/* Custom arrow with animation */}
-                      <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none">
-                        <motion.div
-                          animate={{ y: [0, 3, 0] }}
-                          transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
-                        >
-                          <svg className="w-5 h-5 text-blue-500 group-hover:text-blue-600 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M19 9l-7 7-7-7" />
-                          </svg>
-                        </motion.div>
-                      </div>
-
-                      {/* Top label badge */}
-                      {newAppointment.pays && (
-                        <motion.div 
-                          initial={{ opacity: 0, y: -10 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          className="absolute -top-2.5 left-3 px-2.5 py-0.5 bg-gradient-to-r from-blue-500 to-purple-600 text-white text-xs rounded-full shadow-lg"
-                        >
-                          Sélectionné
-                        </motion.div>
-                      )}
+                  <div className="relative">
+                    <div className="absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none z-10">
+                      <Globe className="w-5 h-5 text-purple-400" />
                     </div>
-                  </motion.div>
-                </motion.div>
+                    <select
+                      value={newAppointment.pays}
+                      onChange={(e) => setNewAppointment({ ...newAppointment, pays: e.target.value, region: '' })}
+                      className="w-full pl-12 pr-4 py-3 border-2 border-gray-300 rounded-2xl focus:border-purple-500 focus:ring-4 focus:ring-purple-100 transition-all outline-none appearance-none bg-white cursor-pointer shadow-sm"
+                    >
+                      <option value="">Sélectionner un pays</option>
+                      {Object.keys(regionsByCountry).map((country) => (
+                        <option key={country} value={country}>
+                          {regionsByCountry[country].name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
 
                 {/* Région */}
-                <motion.div
-                  initial={{ opacity: 0, x: -20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: 0.35 }}
-                >
-                  <label className="block text-sm text-gray-700 mb-2 flex items-center gap-2">
-                    <MapPin className="w-4 h-4 text-purple-500" />
-                    {t('region')}
-                  </label>
-                  <motion.div 
-                    className="relative group"
-                    whileHover={{ scale: newAppointment.pays ? 1.01 : 1 }}
-                  >
-                    {/* Gradient glow effect */}
-                    <div className={`absolute inset-0 bg-gradient-to-r from-purple-500 via-pink-500 to-rose-500 rounded-xl opacity-0 ${newAppointment.pays ? 'group-hover:opacity-20 group-focus-within:opacity-30' : ''} blur transition-all duration-300`} />
-                    
+                {newAppointment.pays && (
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-3">
+                      Région
+                    </label>
                     <div className="relative">
                       <div className="absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none z-10">
-                        <motion.div
-                          animate={{ 
-                            scale: newAppointment.region ? [1, 1.2, 1] : 1,
-                          }}
-                          transition={{ duration: 0.5, ease: "easeInOut" }}
-                        >
-                          <MapPin className={`w-5 h-5 transition-colors ${
-                            !newAppointment.pays 
-                              ? 'text-gray-300' 
-                              : 'text-purple-500 group-hover:text-purple-600'
-                          }`} />
-                        </motion.div>
+                        <MapPin className="w-5 h-5 text-purple-400" />
                       </div>
-                      
                       <select
                         value={newAppointment.region}
                         onChange={(e) => setNewAppointment({ ...newAppointment, region: e.target.value })}
-                        className={`relative w-full pl-12 pr-12 py-3.5 border-2 rounded-xl focus:outline-none transition-all appearance-none cursor-pointer font-medium ${
-                          !newAppointment.pays
-                            ? 'border-gray-200 bg-gray-50 text-gray-400 cursor-not-allowed'
-                            : 'border-gray-200 bg-white text-gray-700 hover:border-purple-300 focus:border-purple-500 hover:shadow-lg group-hover:bg-gradient-to-br group-hover:from-white group-hover:to-purple-50'
-                        }`}
-                        required
-                        disabled={!newAppointment.pays}
+                        className="w-full pl-12 pr-4 py-3 border-2 border-gray-300 rounded-2xl focus:border-purple-500 focus:ring-4 focus:ring-purple-100 transition-all outline-none appearance-none bg-white cursor-pointer shadow-sm"
                       >
-                        <option value="">
-                          {newAppointment.pays ? '📍 Sélectionner une région' : 'Sélectionner d\'abord un pays'}
-                        </option>
-                        {newAppointment.pays && getAvailableRegions(newAppointment.pays).map((group, groupIndex) => (
-                          <optgroup key={groupIndex} label={group.label}>
+                        <option value="">Sélectionner une région</option>
+                        {regionsByCountry[newAppointment.pays].groups.map((group) => (
+                          <optgroup key={group.label} label={group.label}>
                             {group.regions.map((region) => (
                               <option key={region} value={region}>
                                 {region}
@@ -1300,92 +1067,36 @@ export function CalendarView({ doctorId }: CalendarViewProps) {
                           </optgroup>
                         ))}
                       </select>
-                      
-                      {/* Custom arrow with animation */}
-                      <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none">
-                        <motion.div
-                          animate={{ y: newAppointment.pays ? [0, 3, 0] : 0 }}
-                          transition={{ duration: 2, repeat: Infinity, ease: "easeInOut", delay: 0.3 }}
-                        >
-                          <svg className={`w-5 h-5 transition-colors ${
-                            !newAppointment.pays 
-                              ? 'text-gray-300' 
-                              : 'text-purple-500 group-hover:text-purple-600'
-                          }`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M19 9l-7 7-7-7" />
-                          </svg>
-                        </motion.div>
-                      </div>
-
-                      {/* Top label badge */}
-                      {newAppointment.region && (
-                        <motion.div 
-                          initial={{ opacity: 0, y: -10 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          className="absolute -top-2.5 left-3 px-2.5 py-0.5 bg-gradient-to-r from-purple-500 to-pink-600 text-white text-xs rounded-full shadow-lg"
-                        >
-                          Sélectionné
-                        </motion.div>
-                      )}
                     </div>
-                  </motion.div>
-                  
-                  {/* Message d'aide avec animation */}
-                  {!newAppointment.pays ? (
-                    <motion.div
-                      initial={{ opacity: 0, height: 0 }}
-                      animate={{ opacity: 1, height: 'auto' }}
-                      className="mt-2 flex items-center gap-2 px-3 py-2 bg-gradient-to-r from-yellow-50 to-orange-50 rounded-lg border border-yellow-200/50"
-                    >
-                      <motion.div 
-                        className="w-1.5 h-1.5 bg-yellow-500 rounded-full"
-                        animate={{ scale: [1, 1.3, 1] }}
-                        transition={{ duration: 2, repeat: Infinity }}
-                      />
-                      <p className="text-xs font-medium text-yellow-700">
-                        Veuillez d'abord sélectionner un pays
-                      </p>
-                    </motion.div>
-                  ) : newAppointment.pays && getAvailableRegions(newAppointment.pays).length > 0 && (
-                    <motion.div
-                      initial={{ opacity: 0, height: 0 }}
-                      animate={{ opacity: 1, height: 'auto' }}
-                      className="mt-2 flex items-center gap-2 px-3 py-2 bg-gradient-to-r from-purple-50 to-pink-50 rounded-lg border border-purple-200/50"
-                    >
-                      <motion.div 
-                        className="w-1.5 h-1.5 bg-purple-500 rounded-full"
-                        animate={{ scale: [1, 1.3, 1] }}
-                        transition={{ duration: 2, repeat: Infinity }}
-                      />
-                      <p className="text-xs font-medium text-purple-700">
-                        {getAvailableRegions(newAppointment.pays).reduce((total, group) => total + group.regions.length, 0)} région(s) disponible(s) pour {regionsByCountry[newAppointment.pays]?.name || newAppointment.pays}
-                      </p>
-                    </motion.div>
-                  )}
-                </motion.div>
+                  </div>
+                )}
 
-                {/* Action Buttons */}
-                <div className="flex gap-3 pt-4 border-t border-gray-200">
+                {/* Boutons d'action */}
+                <div className="flex gap-4 pt-4 border-t-2 border-gray-200">
                   <motion.button
-                    type="button"
                     whileHover={{ scale: 1.02 }}
                     whileTap={{ scale: 0.98 }}
-                    onClick={() => {
-                      setShowAddAppointment(false);
-                      setEditingAppointment(null);
-                    }}
-                    className="flex-1 border-2 border-gray-300 text-gray-700 py-3 rounded-xl hover:bg-gray-50 transition-colors"
+                    onClick={() => setShowAddAppointment(false)}
+                    disabled={processing}
+                    className="flex-1 px-6 py-3 border-2 border-gray-300 text-gray-700 font-semibold rounded-2xl hover:bg-gray-50 transition-colors disabled:opacity-50 shadow-sm"
                   >
-                    {t('cancel')}
+                    Annuler
                   </motion.button>
                   <motion.button
-                    type="button"
                     whileHover={{ scale: 1.02 }}
                     whileTap={{ scale: 0.98 }}
-                    onClick={editingAppointment ? handleUpdateAppointment : handleAddAppointment}
-                    className="flex-1 bg-gradient-to-r from-blue-500 to-purple-600 text-white py-3 rounded-xl hover:shadow-lg transition-all"
+                    onClick={handleAddAppointment}
+                    disabled={processing}
+                    className="flex-1 px-6 py-3 bg-gradient-to-r from-purple-600 to-pink-600 text-white font-semibold rounded-2xl hover:shadow-xl transition-all disabled:opacity-50 shadow-lg"
                   >
-                    {editingAppointment ? 'Modifier' : 'Ajouter'}
+                    {processing ? (
+                      <div className="flex items-center justify-center gap-2">
+                        <div className="w-6 h-6 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                        Création...
+                      </div>
+                    ) : (
+                      '✅ Créer le rendez-vous'
+                    )}
                   </motion.button>
                 </div>
               </div>
@@ -1394,19 +1105,296 @@ export function CalendarView({ doctorId }: CalendarViewProps) {
         )}
       </AnimatePresence>
 
-      {/* Confirm appointment modal */}
+      {/* Modal Modification - COMPLET (similaire au modal de création) */}
+      <AnimatePresence>
+        {editingAppointment && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={() => !processing && setEditingAppointment(null)}
+            className="fixed inset-0 bg-black/70 backdrop-blur-md flex items-center justify-center z-50 p-4"
+          >
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0, y: 20 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.9, opacity: 0, y: 20 }}
+              onClick={(e) => e.stopPropagation()}
+              className="bg-white rounded-3xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto"
+            >
+              <div className="sticky top-0 bg-gradient-to-r from-blue-600 to-purple-600 text-white p-6 rounded-t-3xl z-10 shadow-lg">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-2xl font-bold">Modifier le Rendez-vous</h3>
+                  <motion.button
+                    whileHover={{ scale: 1.1, rotate: 90 }}
+                    whileTap={{ scale: 0.9 }}
+                    onClick={() => setEditingAppointment(null)}
+                    disabled={processing}
+                    className="p-2 hover:bg-white/20 rounded-xl transition-colors"
+                  >
+                    <X className="w-6 h-6" />
+                  </motion.button>
+                </div>
+              </div>
+
+              <div className="p-6 space-y-5">
+                {/* Nom du patient */}
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-3">
+                    Nom du patient <span className="text-red-500">*</span>
+                  </label>
+                  <div className="relative">
+                    <div className="absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none">
+                      <User className="w-5 h-5 text-blue-400" />
+                    </div>
+                    <input
+                      type="text"
+                      value={editFormData.patientName}
+                      onChange={(e) => setEditFormData({ ...editFormData, patientName: e.target.value })}
+                      className="w-full pl-12 pr-4 py-3 border-2 border-gray-300 rounded-2xl focus:border-blue-500 focus:ring-4 focus:ring-blue-100 transition-all outline-none shadow-sm"
+                      placeholder="Ex: Mohamed Gharbi"
+                    />
+                  </div>
+                </div>
+
+                {/* Téléphone */}
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-3">
+                    Téléphone <span className="text-red-500">*</span>
+                  </label>
+                  <div className="relative">
+                    <div className="absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none">
+                      <Phone className="w-5 h-5 text-blue-400" />
+                    </div>
+                    <input
+                      type="tel"
+                      value={editFormData.patientPhone}
+                      onChange={(e) => setEditFormData({ ...editFormData, patientPhone: e.target.value })}
+                      className="w-full pl-12 pr-4 py-3 border-2 border-gray-300 rounded-2xl focus:border-blue-500 focus:ring-4 focus:ring-blue-100 transition-all outline-none shadow-sm"
+                      placeholder="+216 98 123 456"
+                    />
+                  </div>
+                </div>
+
+                {/* Date du rendez-vous */}
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-3">
+                    Date du rendez-vous <span className="text-red-500">*</span>
+                  </label>
+                  <div className="relative">
+                    <div className="absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none z-10">
+                      <Calendar className="w-5 h-5 text-blue-400" />
+                    </div>
+                    <input
+                      type="date"
+                      value={editFormData.date}
+                      onChange={(e) => setEditFormData({ ...editFormData, date: e.target.value })}
+                      className="w-full pl-12 pr-4 py-3 border-2 border-gray-300 rounded-2xl focus:border-blue-500 focus:ring-4 focus:ring-blue-100 transition-all outline-none shadow-sm"
+                    />
+                  </div>
+                </div>
+
+                {/* Heure - Sélecteur moderne Heures & Minutes */}
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-3">
+                    Heure du rendez-vous <span className="text-red-500">*</span>
+                  </label>
+                  <div className="flex gap-4">
+                    {/* Heures */}
+                    <div className="flex-1">
+                      <div className="relative">
+                        <div className="absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none z-10">
+                          <Clock className="w-5 h-5 text-blue-400" />
+                        </div>
+                        <select
+                          value={editFormData.hour}
+                          onChange={(e) => setEditFormData({ ...editFormData, hour: e.target.value })}
+                          className="w-full pl-12 pr-4 py-3 font-semibold border-2 border-gray-300 rounded-2xl focus:border-blue-500 focus:ring-4 focus:ring-blue-100 transition-all outline-none appearance-none bg-white cursor-pointer shadow-sm"
+                        >
+                          {hours.map((h) => (
+                            <option key={h} value={h}>
+                              {h}h
+                            </option>
+                          ))}
+                        </select>
+                        <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-gray-400 text-sm font-medium">
+                          
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Minutes */}
+                    <div className="flex-1">
+                      <div className="relative">
+                        <select
+                          value={editFormData.minute}
+                          onChange={(e) => setEditFormData({ ...editFormData, minute: e.target.value })}
+                          className="w-full pl-4 pr-4 py-3 font-semibold border-2 border-gray-300 rounded-2xl focus:border-blue-500 focus:ring-4 focus:ring-blue-100 transition-all outline-none appearance-none bg-white cursor-pointer shadow-sm"
+                        >
+                          {minutes.map((m) => (
+                            <option key={m} value={m}>
+                              {m} min
+                            </option>
+                          ))}
+                        </select>
+                        <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-gray-400 text-sm font-medium">
+                          
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="mt-3 p-3 bg-blue-50 rounded-xl border border-blue-200">
+                    <p className="text-center text-blue-900 font-bold text-xl">
+                      🕐 {editFormData.hour}:{editFormData.minute}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Date de naissance */}
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-3">
+                    Date de naissance
+                  </label>
+                  <div className="relative">
+                    <div className="absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none z-10">
+                      <Calendar className="w-5 h-5 text-blue-400" />
+                    </div>
+                    <input
+                      type="date"
+                      value={editFormData.birthDate}
+                      onChange={(e) => setEditFormData({ ...editFormData, birthDate: e.target.value })}
+                      className="w-full pl-12 pr-4 py-3 border-2 border-gray-300 rounded-2xl focus:border-blue-500 focus:ring-4 focus:ring-blue-100 transition-all outline-none shadow-sm"
+                    />
+                  </div>
+                </div>
+
+                {/* Profession */}
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-3">
+                    Profession
+                  </label>
+                  <div className="relative">
+                    <div className="absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none">
+                      <Briefcase className="w-5 h-5 text-blue-400" />
+                    </div>
+                    <input
+                      type="text"
+                      value={editFormData.profession}
+                      onChange={(e) => setEditFormData({ ...editFormData, profession: e.target.value })}
+                      className="w-full pl-12 pr-4 py-3 border-2 border-gray-300 rounded-2xl focus:border-blue-500 focus:ring-4 focus:ring-blue-100 transition-all outline-none shadow-sm"
+                      placeholder="Ex: Ingénieur, Enseignant..."
+                    />
+                  </div>
+                </div>
+
+                {/* Pays */}
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-3">
+                    Pays
+                  </label>
+                  <div className="relative">
+                    <div className="absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none z-10">
+                      <Globe className="w-5 h-5 text-blue-400" />
+                    </div>
+                    <select
+                      value={editFormData.pays}
+                      onChange={(e) => setEditFormData({ ...editFormData, pays: e.target.value, region: '' })}
+                      className="w-full pl-12 pr-4 py-3 border-2 border-gray-300 rounded-2xl focus:border-blue-500 focus:ring-4 focus:ring-blue-100 transition-all outline-none appearance-none bg-white cursor-pointer shadow-sm"
+                    >
+                      <option value="">Sélectionner un pays</option>
+                      {Object.keys(regionsByCountry).map((country) => (
+                        <option key={country} value={country}>
+                          {regionsByCountry[country].name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                {/* Région */}
+                {editFormData.pays && (
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-3">
+                      Région
+                    </label>
+                    <div className="relative">
+                      <div className="absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none z-10">
+                        <MapPin className="w-5 h-5 text-blue-400" />
+                      </div>
+                      <select
+                        value={editFormData.region}
+                        onChange={(e) => setEditFormData({ ...editFormData, region: e.target.value })}
+                        className="w-full pl-12 pr-4 py-3 border-2 border-gray-300 rounded-2xl focus:border-blue-500 focus:ring-4 focus:ring-blue-100 transition-all outline-none appearance-none bg-white cursor-pointer shadow-sm"
+                      >
+                        <option value="">Sélectionner une région</option>
+                        {regionsByCountry[editFormData.pays].groups.map((group) => (
+                          <optgroup key={group.label} label={group.label}>
+                            {group.regions.map((region) => (
+                              <option key={region} value={region}>
+                                {region}
+                              </option>
+                            ))}
+                          </optgroup>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                )}
+
+                {/* Boutons d'action */}
+                <div className="flex gap-4 pt-4 border-t-2 border-gray-200">
+                  <motion.button
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                    onClick={() => setEditingAppointment(null)}
+                    disabled={processing}
+                    className="flex-1 px-6 py-3 border-2 border-gray-300 text-gray-700 font-semibold rounded-2xl hover:bg-gray-50 transition-colors disabled:opacity-50 shadow-sm"
+                  >
+                    Annuler
+                  </motion.button>
+                  <motion.button
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                    onClick={handleUpdateAppointment}
+                    disabled={processing}
+                    className="flex-1 px-6 py-3 bg-gradient-to-r from-blue-600 to-purple-600 text-white font-semibold rounded-2xl hover:shadow-xl transition-all disabled:opacity-50 shadow-lg"
+                  >
+                    {processing ? (
+                      <div className="flex items-center justify-center gap-2">
+                        <div className="w-6 h-6 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                        Modification...
+                      </div>
+                    ) : (
+                      '✅ Enregistrer les modifications'
+                    )}
+                  </motion.button>
+                </div>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Modal Confirmation */}
       <AnimatePresence>
         {showConfirmDialog && (
           <AppointmentConfirmation
-            appointment={showConfirmDialog}
-            doctorTariff={DOCTOR_TARIFF}
+            appointment={{
+              id: showConfirmDialog.id,
+              patientName: showConfirmDialog.patient_name,
+              patientPhone: showConfirmDialog.patient_phone || '',
+              time: showConfirmDialog.time,
+              type: showConfirmDialog.type as 'consultation' | 'control',
+              pays: showConfirmDialog.pays,
+            }}
+            doctorTariff={doctorTarif}
             onConfirm={handleConfirmAppointment}
             onCancel={() => setShowConfirmDialog(null)}
           />
         )}
       </AnimatePresence>
 
-      {/* Delete confirmation modal */}
+      {/* Modal Suppression */}
       <AnimatePresence>
         {showDeleteDialog && (
           <motion.div
@@ -1414,33 +1402,41 @@ export function CalendarView({ doctorId }: CalendarViewProps) {
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             onClick={() => setShowDeleteDialog(null)}
-            className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50"
+            className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4"
           >
             <motion.div
               initial={{ scale: 0.9, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.9, opacity: 0 }}
               onClick={(e) => e.stopPropagation()}
-              className="bg-white rounded-2xl p-8 max-w-md w-full shadow-2xl"
+              className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6"
             >
-              <h3 className="text-gray-900 mb-4">Supprimer le rendez-vous</h3>
-              <p className="text-gray-600 mb-6">
-                Êtes-vous sûr de vouloir supprimer le rendez-vous de{' '}
-                <strong>{showDeleteDialog.patientName}</strong> à {showDeleteDialog.time} ?
-              </p>
-              <div className="flex gap-4">
-                <button
-                  onClick={() => setShowDeleteDialog(null)}
-                  className="flex-1 border-2 border-gray-300 text-gray-700 py-3 rounded-xl hover:bg-gray-50"
-                >
-                  {t('cancel')}
-                </button>
-                <button
-                  onClick={confirmDelete}
-                  className="flex-1 bg-red-500 text-white py-3 rounded-xl hover:bg-red-600"
-                >
-                  Supprimer
-                </button>
+              <div className="text-center">
+                <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <Trash2 className="w-8 h-8 text-red-600" />
+                </div>
+                <h3 className="text-xl font-semibold text-gray-900 mb-2">
+                  Supprimer le rendez-vous
+                </h3>
+                <p className="text-gray-600 mb-6">
+                  Êtes-vous sûr de vouloir supprimer ce rendez-vous ?<br />
+                  Cette action est irréversible.
+                </p>
+
+                <div className="flex gap-3">
+                  <button
+                    onClick={() => setShowDeleteDialog(null)}
+                    className="flex-1 px-4 py-2 border-2 border-gray-300 rounded-xl hover:bg-gray-50 transition-colors"
+                  >
+                    Annuler
+                  </button>
+                  <button
+                    onClick={() => handleDeleteAppointment(showDeleteDialog)}
+                    className="flex-1 px-4 py-2 bg-red-500 text-white rounded-xl hover:bg-red-600 transition-colors"
+                  >
+                    Supprimer
+                  </button>
+                </div>
               </div>
             </motion.div>
           </motion.div>

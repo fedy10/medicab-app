@@ -20,6 +20,7 @@ export interface Database {
           specialty: string | null
           status: 'active' | 'suspended'
           assigned_doctor_id: string | null
+          tarif: number | null
           created_at: string
           updated_at: string
         }
@@ -33,6 +34,7 @@ export interface Database {
           specialty?: string | null
           status?: 'active' | 'suspended'
           assigned_doctor_id?: string | null
+          tarif?: number | null
           created_at?: string
           updated_at?: string
         }
@@ -46,6 +48,7 @@ export interface Database {
           specialty?: string | null
           status?: 'active' | 'suspended'
           assigned_doctor_id?: string | null
+          tarif?: number | null
           created_at?: string
           updated_at?: string
         }
@@ -60,6 +63,10 @@ export interface Database {
           address: string | null
           diseases: Json | null
           doctor_id: string
+          birth_date: string | null
+          profession: string | null
+          pays: string | null
+          region: string | null
           created_at: string
           updated_at: string
         }
@@ -72,6 +79,10 @@ export interface Database {
           address?: string | null
           diseases?: Json | null
           doctor_id: string
+          birth_date?: string | null
+          profession?: string | null
+          pays?: string | null
+          region?: string | null
           created_at?: string
           updated_at?: string
         }
@@ -84,6 +95,10 @@ export interface Database {
           address?: string | null
           diseases?: Json | null
           doctor_id?: string
+          birth_date?: string | null
+          profession?: string | null
+          pays?: string | null
+          region?: string | null
           created_at?: string
           updated_at?: string
         }
@@ -148,6 +163,11 @@ export interface Database {
           prescription: string | null
           notes: string | null
           files: Json | null
+          appointment_id: string | null
+          payment_type: 'normal' | 'gratuit' | 'assurance' | null
+          payment_amount: number | null
+          insurance_patient_amount: number | null
+          insurance_reimbursed_amount: number | null
           created_at: string
           updated_at: string
         }
@@ -163,6 +183,11 @@ export interface Database {
           prescription?: string | null
           notes?: string | null
           files?: Json | null
+          appointment_id?: string | null
+          payment_type?: 'normal' | 'gratuit' | 'assurance' | null
+          payment_amount?: number | null
+          insurance_patient_amount?: number | null
+          insurance_reimbursed_amount?: number | null
           created_at?: string
           updated_at?: string
         }
@@ -178,6 +203,11 @@ export interface Database {
           prescription?: string | null
           notes?: string | null
           files?: Json | null
+          appointment_id?: string | null
+          payment_type?: 'normal' | 'gratuit' | 'assurance' | null
+          payment_amount?: number | null
+          insurance_patient_amount?: number | null
+          insurance_reimbursed_amount?: number | null
           created_at?: string
           updated_at?: string
         }

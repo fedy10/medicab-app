@@ -62,27 +62,10 @@ const doctorInfo = {
 
 export function PatientFileView({ patient, onClose, canUploadFiles = true }: PatientFileViewProps) {
   const { t } = useLanguage();
-  const [files, setFiles] = useState<PatientFile[]>(patient.files || [
-    {
-      id: '1',
-      name: 'Résultats_IRM_20241015.pdf',
-      type: 'IRM',
-      uploadDate: '15/10/2024',
-      uploadedBy: 'Secrétaire',
-      size: '2.4 MB',
-    },
-    {
-      id: '2',
-      name: 'Analyses_sang_20241110.pdf',
-      type: 'Analyse',
-      uploadDate: '10/11/2024',
-      uploadedBy: 'Dr. Ben Ali',
-      size: '1.1 MB',
-    },
-  ]);
+  const [files, setFiles] = useState<PatientFile[]>(patient.files || []);
 
   const [showUploadDialog, setShowUploadDialog] = useState(false);
-  const [consultations, setConsultations] = useState<ConsultationHistory[]>(patient.consultations);
+  const [consultations, setConsultations] = useState<ConsultationHistory[]>(patient.consultations || []);
   const [printDocument, setPrintDocument] = useState<{
     type: 'prescription' | 'analysis' | 'imaging';
     content: string;

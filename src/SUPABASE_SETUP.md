@@ -1,268 +1,214 @@
-# 🚀 Configuration Supabase - MediCab
+# Configuration Supabase pour MediCab
 
-Ce guide vous accompagne dans la configuration complète de Supabase pour votre application de gestion de cabinet médical.
+## 📋 Étapes de Configuration
 
-## 📋 Prérequis
+### 1. Créer un Projet Supabase
 
-- Un compte Supabase (gratuit) : https://supabase.com
-- Node.js et npm installés
-- Votre application MediCab locale
+1. Allez sur [supabase.com](https://supabase.com)
+2. Connectez-vous ou créez un compte
+3. Cliquez sur "New Project"
+4. Remplissez les informations :
+   - **Name**: MediCab (ou le nom de votre choix)
+   - **Database Password**: Choisissez un mot de passe fort
+   - **Region**: Choisissez la région la plus proche
+5. Cliquez sur "Create new project" et attendez quelques minutes
 
-## 🔧 Étape 1 : Créer un Projet Supabase
+### 2. Exécuter le Schema SQL
 
-1. **Créer un compte** sur https://supabase.com
-2. **Créer un nouveau projet** :
-   - Nom du projet : `medicab` (ou votre choix)
-   - Mot de passe de la base de données : *Choisissez un mot de passe fort*
-   - Région : Choisissez la plus proche (ex: `eu-central-1` pour l'Europe)
-3. **Attendre** que le projet soit provisionné (2-3 minutes)
+1. Dans votre projet Supabase, allez dans **SQL Editor** (dans le menu de gauche)
+2. Cliquez sur "New Query"
+3. Copiez le contenu du fichier SQL que vous avez créé (avec toutes les tables, fonctions, triggers, etc.)
+4. Collez-le dans l'éditeur SQL
+5. Cliquez sur "Run" pour exécuter le script
 
-## 🗄️ Étape 2 : Créer le Schéma de la Base de Données
+### 3. Récupérer les Identifiants
 
-1. **Ouvrir le SQL Editor** dans Supabase :
-   - Menu latéral → SQL Editor
-   
-2. **Copier le contenu** du fichier `/supabase/schema.sql`
+1. Allez dans **Settings** > **API**
+2. Copiez les deux informations suivantes :
+   - **Project URL** (commence par `https://...supabase.co`)
+   - **anon/public** key (une longue chaîne de caractères)
 
-3. **Exécuter le script SQL** :
-   - Coller le contenu dans l'éditeur
-   - Cliquer sur "Run" (ou Ctrl/Cmd + Enter)
-   - Vérifier qu'il n'y a pas d'erreurs
+### 4. Configurer les Variables d'Environnement
 
-4. **Vérifier les tables créées** :
-   - Menu latéral → Table Editor
-   - Vous devriez voir : `profiles`, `patients`, `appointments`, `consultations`, `chat_messages`, `referral_letters`, `notifications`, `revenues`, `medical_files`
-
-## 🔐 Étape 3 : Configurer l'Authentication
-
-1. **Activer Email/Password Auth** :
-   - Menu latéral → Authentication → Providers
-   - Activer "Email" si ce n'est pas déjà fait
-
-2. **Désactiver la confirmation d'email** (pour le développement) :
-   - Authentication → Settings
-   - Désactiver "Enable email confirmations"
-   - **⚠️ En production, réactivez cette option !**
-
-## 🗝️ Étape 4 : Récupérer les Clés API
-
-1. **Aller dans les Settings** :
-   - Menu latéral → Settings → API
-
-2. **Copier les informations suivantes** :
-   - **Project URL** : `https://votre-projet.supabase.co`
-   - **anon public** key : Une longue chaîne de caractères
-
-3. **Créer le fichier `.env`** à la racine du projet :
-   ```bash
-   cp .env.example .env
-   ```
-
-4. **Remplir le fichier `.env`** :
-   ```env
-   VITE_SUPABASE_URL=https://votre-projet.supabase.co
-   VITE_SUPABASE_ANON_KEY=votre-cle-anon-publique-ici
-   ```
-
-## 👥 Étape 5 : Créer les Utilisateurs de Démonstration
-
-### Via l'Interface Supabase
-
-1. **Aller dans Authentication** :
-   - Menu latéral → Authentication → Users
-   
-2. **Créer les 3 utilisateurs** :
-
-#### 🔑 Administrateur
-- **Add user** → Create new user
-- Email : `admin@medicab.tn`
-- Password : `admin123`
-- Auto Confirm User : ✅ (coché)
-- Cliquer sur "Create user"
-- **Copier l'User UID** généré
-
-Ensuite, aller dans **Table Editor** → **profiles** et mettre à jour la ligne correspondante :
-```sql
--- Trouver la ligne avec l'id de l'admin et modifier :
-role = 'admin'
-name = 'Administrateur'
-status = 'active'
-```
-
-#### 👨‍⚕️ Médecin
-- Email : `dr.ben.ali@medicab.tn`
-- Password : `doctor123`
-- Auto Confirm User : ✅
-- **Copier l'User UID**
-
-Mettre à jour dans **profiles** :
-```sql
-role = 'doctor'
-name = 'Dr. Ahmed Ben Ali'
-specialty = 'Médecine générale'
-status = 'active'
-phone = '+216 98 765 432'
-address = 'Cabinet Médical, Avenue Habib Bourguiba, Tunis'
-```
-
-#### 👩‍💼 Secrétaire
-- Email : `fatma.sec@medicab.tn`
-- Password : `secretary123`
-- Auto Confirm User : ✅
-
-Mettre à jour dans **profiles** :
-```sql
-role = 'secretary'
-name = 'Fatma Trabelsi'
-status = 'active'
-phone = '+216 22 345 678'
-address = 'Tunis, Tunisie'
-assigned_doctor_id = 'UID-du-médecin-créé-ci-dessus'
-```
-
-### Ou via SQL (Plus rapide)
-
-Exécutez ce script dans le **SQL Editor** (remplacez les IDs par vos vrais UUIDs d'utilisateurs) :
-
-```sql
--- Après avoir créé les utilisateurs dans Auth, mettre à jour leurs profils :
-UPDATE public.profiles 
-SET 
-  name = 'Administrateur',
-  role = 'admin',
-  status = 'active',
-  phone = '+216 71 123 456',
-  address = 'Tunis, Tunisie'
-WHERE email = 'admin@medicab.tn';
-
-UPDATE public.profiles 
-SET 
-  name = 'Dr. Ahmed Ben Ali',
-  role = 'doctor',
-  specialty = 'Médecine générale',
-  status = 'active',
-  phone = '+216 98 765 432',
-  address = 'Cabinet Médical, Avenue Habib Bourguiba, Tunis'
-WHERE email = 'dr.ben.ali@medicab.tn';
-
-UPDATE public.profiles 
-SET 
-  name = 'Fatma Trabelsi',
-  role = 'secretary',
-  status = 'active',
-  phone = '+216 22 345 678',
-  address = 'Tunis, Tunisie',
-  assigned_doctor_id = (SELECT id FROM public.profiles WHERE email = 'dr.ben.ali@medicab.tn')
-WHERE email = 'fatma.sec@medicab.tn';
-```
-
-## 📦 Étape 6 : Configurer le Storage
-
-1. **Aller dans Storage** :
-   - Menu latéral → Storage
-
-2. **Vérifier le bucket `medical-files`** :
-   - Il devrait déjà être créé par le script SQL
-   - Si ce n'est pas le cas, créez-le manuellement :
-     - Nom : `medical-files`
-     - Public : Non (décoché)
-
-3. **Vérifier les policies** :
-   - Cliquer sur le bucket → Policies
-   - Vous devriez voir les policies créées par le script SQL
-
-## 🔄 Étape 7 : Installer les Dépendances
+1. À la racine du projet, créez un fichier `.env` (ou modifiez-le s'il existe)
+2. Ajoutez ces deux lignes (remplacez par vos vraies valeurs) :
 
 ```bash
-npm install @supabase/supabase-js
+VITE_SUPABASE_URL=https://votre-projet.supabase.co
+VITE_SUPABASE_ANON_KEY=votre-cle-anon-publique-tres-longue
 ```
 
-## 🧪 Étape 8 : Tester la Connexion
+### 5. Désactiver la Confirmation Email (Optionnel pour le développement)
 
-1. **Redémarrer le serveur de développement** :
-   ```bash
-   npm run dev
-   ```
+Pour éviter d'avoir à confirmer les emails lors du développement :
 
-2. **Tester la connexion** :
-   - Ouvrir l'application
-   - Essayer de se connecter avec : `admin@medicab.tn` / `admin123`
-   - Vérifier dans la console qu'il n'y a pas d'erreurs
+1. Allez dans **Authentication** > **Email Templates**
+2. Désactivez temporairement "Confirm email" si vous voulez tester rapidement
 
-## 📊 Étape 9 : Vérifier les Permissions (RLS)
+**⚠️ IMPORTANT**: Réactivez cette option en production !
 
-Row Level Security (RLS) est activé pour protéger vos données. Vérifiez que :
+### 6. Créer un Compte Admin
 
-1. **Les policies sont actives** :
-   - Table Editor → Sélectionner une table → RLS est activé (cadenas vert)
+Deux options :
 
-2. **Tester les permissions** :
-   - Connectez-vous avec différents comptes
-   - Vérifiez que chaque rôle voit uniquement ses données
+#### Option A : Via l'Interface Supabase
+1. Allez dans **Authentication** > **Users**
+2. Cliquez sur "Add user" > "Create new user"
+3. Entrez :
+   - Email: `admin@medicab.com`
+   - Password: `Admin123!`
+   - Auto Confirm User: ✅ (coché)
+4. Cliquez sur "Create user"
+5. Allez dans **Table Editor** > **profiles**
+6. Trouvez l'utilisateur que vous venez de créer
+7. Modifiez le champ `role` à `admin`
+8. Modifiez le champ `status` à `active`
 
-## 🎯 Étape 10 : Données de Test (Optionnel)
+#### Option B : Via SQL
+Exécutez ce SQL dans le **SQL Editor** :
 
-Pour ajouter des données de test :
-
-1. **Patients** :
 ```sql
--- Insérer via Table Editor ou SQL
-INSERT INTO public.patients (name, age, phone, email, address, doctor_id)
-VALUES 
-  ('Mohamed Ali', 45, '+216 98 123 456', 'mohamed@email.tn', 'Tunis', 'ID-DU-MEDECIN'),
-  ('Fatma Gharbi', 32, '+216 22 654 321', 'fatma@email.tn', 'Sfax', 'ID-DU-MEDECIN');
+-- Insérer un admin (remplacez l'email et le mot de passe si nécessaire)
+-- Note: Le mot de passe doit être défini via l'interface auth ou via la fonction auth.signup()
+INSERT INTO auth.users (
+  instance_id,
+  id,
+  aud,
+  role,
+  email,
+  encrypted_password,
+  email_confirmed_at,
+  raw_app_meta_data,
+  raw_user_meta_data,
+  created_at,
+  updated_at
+) VALUES (
+  '00000000-0000-0000-0000-000000000000',
+  gen_random_uuid(),
+  'authenticated',
+  'authenticated',
+  'admin@medicab.com',
+  crypt('Admin123!', gen_salt('bf')),  -- Mot de passe: Admin123!
+  NOW(),
+  '{"provider":"email","providers":["email"]}',
+  '{"name":"Administrateur","role":"admin"}',
+  NOW(),
+  NOW()
+) RETURNING id;
+
+-- Puis créer le profil avec le role admin
+-- Remplacez 'l-uuid-retourne-ci-dessus' par l'UUID retourné
+INSERT INTO public.profiles (id, email, name, role, status)
+VALUES (
+  'l-uuid-retourne-ci-dessus',
+  'admin@medicab.com',
+  'Administrateur',
+  'admin',
+  'active'
+);
 ```
 
-2. **Rendez-vous** :
-```sql
-INSERT INTO public.appointments (patient_name, patient_id, doctor_id, date, time, type, status, created_by)
-VALUES 
-  ('Mohamed Ali', 'ID-PATIENT', 'ID-MEDECIN', '2025-01-15', '10:00', 'consultation', 'scheduled', 'ID-MEDECIN');
+### 7. Redémarrer l'Application
+
+```bash
+# Arrêter le serveur (Ctrl+C)
+# Puis relancer
+npm run dev
 ```
 
-## 🔧 Debugging
+## 🧪 Tester la Configuration
 
-### Erreur : "Invalid API key"
-- Vérifiez que `.env` contient les bonnes clés
-- Redémarrez le serveur (`npm run dev`)
+1. Ouvrez l'application
+2. Vous devriez voir la page de connexion (pas le message "Configuration Supabase Requise")
+3. Connectez-vous avec :
+   - Email: `admin@medicab.com`
+   - Mot de passe: `Admin123!`
 
-### Erreur : "Row Level Security policy violation"
-- Vérifiez que les policies RLS sont bien créées
-- Vérifiez que l'utilisateur a le bon rôle dans `profiles`
+## 📊 Structure de la Base de Données
 
-### Erreur : "relation does not exist"
-- Vérifiez que le script SQL a bien été exécuté
-- Vérifiez dans Table Editor que les tables existent
+### Tables Principales
+
+- **profiles** : Utilisateurs (admin, médecins, secrétaires)
+- **patients** : Patients du cabinet
+- **appointments** : Rendez-vous
+- **consultations** : Consultations médicales
+- **referral_letters** : Lettres d'orientation
+- **chat_messages** : Messages entre utilisateurs
+- **notifications** : Notifications système
+- **revenues** : Revenus des médecins
+
+### Fonctionnalités Automatiques
+
+- ✅ **Triggers** : Mise à jour automatique de `updated_at`
+- ✅ **RLS (Row Level Security)** : Sécurité au niveau des lignes
+- ✅ **Fonctions SECURITY DEFINER** : Évite la récursion RLS
+- ✅ **Index** : Optimisation des requêtes
+- ✅ **Real-time** : Notifications en temps réel (chat)
+
+## 🔒 Sécurité
+
+### Row Level Security (RLS)
+
+Toutes les tables ont des politiques RLS pour garantir que :
+- Les admins peuvent tout voir
+- Les médecins voient leurs propres données
+- Les secrétaires voient les données de leur médecin assigné
+- Le chat est privé entre les utilisateurs autorisés
+
+### Statuts des Comptes
+
+- **Médecins** : Créés avec statut `suspended` - doivent être activés par l'admin
+- **Secrétaires** : Créées avec statut `active` directement
+- **Admin** : Toujours `active`
+
+## 🐛 Dépannage
+
+### Problème : "Configuration Supabase Requise" s'affiche toujours
+
+**Solution** :
+1. Vérifiez que le fichier `.env` est à la racine du projet
+2. Vérifiez que les variables commencent par `VITE_`
+3. Redémarrez complètement le serveur (`Ctrl+C` puis `npm run dev`)
+4. Vérifiez dans la console navigateur qu'il n'y a pas d'erreurs
+
+### Problème : "Email ou mot de passe incorrect"
+
+**Solutions** :
+1. Vérifiez que l'email est confirmé dans Supabase (Authentication > Users)
+2. Vérifiez que le statut du profil est `active`
+3. Vérifiez que le rôle est bien défini dans la table `profiles`
+
+### Problème : "Profil non trouvé"
+
+**Solution** :
+1. Allez dans **Table Editor** > **profiles**
+2. Vérifiez qu'il y a bien une ligne correspondant à votre utilisateur
+3. Si non, le trigger `on_auth_user_created` n'a peut-être pas fonctionné
+4. Créez manuellement le profil avec un INSERT SQL
+
+### Problème : Erreurs de permissions
+
+**Solution** :
+1. Vérifiez que toutes les politiques RLS sont bien créées
+2. Exécutez à nouveau tout le script SQL
+3. Vérifiez dans **Authentication** > **Policies** que les politiques existent
 
 ## 📚 Ressources
 
 - [Documentation Supabase](https://supabase.com/docs)
-- [Row Level Security](https://supabase.com/docs/guides/auth/row-level-security)
-- [Supabase Storage](https://supabase.com/docs/guides/storage)
-- [Real-time avec Supabase](https://supabase.com/docs/guides/realtime)
+- [Guide Row Level Security](https://supabase.com/docs/guides/auth/row-level-security)
+- [Supabase CLI](https://supabase.com/docs/guides/cli)
 
-## ✅ Checklist Finale
+## ✅ Checklist de Vérification
 
 - [ ] Projet Supabase créé
-- [ ] Schéma SQL exécuté sans erreur
-- [ ] Tables visibles dans Table Editor
-- [ ] Fichier `.env` configuré
-- [ ] 3 utilisateurs créés et configurés
-- [ ] Bucket `medical-files` créé
-- [ ] Connexion testée avec succès
-- [ ] RLS activé sur toutes les tables
+- [ ] Script SQL exécuté sans erreurs
+- [ ] Variables d'environnement configurées dans `.env`
+- [ ] Serveur redémarré
+- [ ] Compte admin créé
+- [ ] Connexion réussie avec le compte admin
+- [ ] Page d'accueil s'affiche correctement
 
-## 🎉 Prêt !
+---
 
-Votre application MediCab est maintenant connectée à Supabase ! Toutes vos données seront sauvegardées dans le cloud et synchronisées en temps réel.
-
-Pour passer de localStorage à Supabase dans votre code, remplacez :
-```typescript
-// Ancien (localStorage)
-import { dataStore } from './utils/dataStore';
-dataStore.getPatients();
-
-// Nouveau (Supabase)
-import { patientService } from './lib/services/supabaseService';
-await patientService.getAll();
-```
+**🎉 Félicitations !** Votre application MediCab est maintenant connectée à Supabase !

@@ -1,23 +1,24 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { X, User, Mail, Phone, Lock, Eye, EyeOff, Stethoscope, Briefcase } from 'lucide-react';
+import { profileService } from '../../lib/services/supabaseService';
+import { supabase } from '../../lib/supabase';
 
 interface ProfileModalProps {
   isOpen: boolean;
   onClose: () => void;
-  user: {
+  profile: {
     id: string;
-    nom: string;
-    prenom: string;
+    name: string;
     email: string;
     role: string;
-    telephone?: string;
-    specialite?: string;
-    doctorCode?: string;
+    phone?: string;
+    specialty?: string;
+    address?: string;
   };
 }
 
-export function ProfileModal({ isOpen, onClose, user }: ProfileModalProps) {
+export function ProfileModal({ isOpen, onClose, profile }: ProfileModalProps) {
   const [activeTab, setActiveTab] = useState<'info' | 'password'>('info');
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
@@ -25,54 +26,75 @@ export function ProfileModal({ isOpen, onClose, user }: ProfileModalProps) {
   const [showCurrentPassword, setShowCurrentPassword] = useState(false);
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [loading, setLoading] = useState(false);
 
-  const handlePasswordChange = () => {
+  // Extraire prénom/nom du name complet
+  const nameParts = profile.name.split(' ');
+  const prenom = nameParts[0] || '';
+  const nom = nameParts.slice(1).join(' ') || nameParts[0] || '';
+
+  const handlePasswordChange = async () => {
     if (!currentPassword.trim() || !newPassword.trim()) {
       alert('Veuillez remplir tous les champs');
       return;
     }
 
-    // Verify current password
+    if (newPassword !== confirmPassword) {
+      alert('Les mots de passe ne correspondent pas');
+      return;
+    }
+
+    if (newPassword.length < 6) {
+      alert('Le nouveau mot de passe doit contenir au moins 6 caractères');
+      return;
+    }
+
     try {
-      const usersData = localStorage.getItem('demo_users');
-      if (usersData) {
-        const users = JSON.parse(usersData);
-        const currentUser = users.find((u: any) => u.id === user.id);
-        
-        if (!currentUser) {
-          alert('Utilisateur non trouvé');
-          return;
-        }
+      setLoading(true);
 
-        if (currentUser.password !== currentPassword) {
-          alert('Mot de passe actuel incorrect');
-          return;
-        }
+      // Vérifier le mot de passe actuel en tentant de se connecter
+      const { error: signInError } = await supabase.auth.signInWithPassword({
+        email: profile.email,
+        password: currentPassword,
+      });
 
-        if (newPassword !== confirmPassword) {
-          alert('Les nouveaux mots de passe ne correspondent pas');
-          return;
-        }
-
-        if (newPassword.length < 6) {
-          alert('Le nouveau mot de passe doit contenir au moins 6 caractères');
-          return;
-        }
-
-        // Update password
-        const updatedUsers = users.map((u: any) =>
-          u.id === user.id ? { ...u, password: newPassword } : u
-        );
-        localStorage.setItem('demo_users', JSON.stringify(updatedUsers));
-        
-        alert('Mot de passe modifié avec succès');
-        setCurrentPassword('');
-        setNewPassword('');
-        setConfirmPassword('');
+      if (signInError) {
+        alert('❌ Mot de passe actuel incorrect');
+        return;
       }
-    } catch (error) {
-      console.error('Error changing password:', error);
-      alert('Erreur lors de la modification du mot de passe');
+
+      // Mettre à jour le mot de passe
+      const { error: updateError } = await supabase.auth.updateUser({
+        password: newPassword,
+      });
+
+      if (updateError) {
+        throw updateError;
+      }
+
+      alert('✅ Mot de passe modifié avec succès');
+      setCurrentPassword('');
+      setNewPassword('');
+      setConfirmPassword('');
+      setActiveTab('info');
+    } catch (error: any) {
+      console.error('Erreur modification mot de passe:', error);
+      alert('❌ Erreur: ' + error.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const getRoleColor = (role: string) => {
+    switch (role) {
+      case 'admin':
+        return 'from-blue-500 to-blue-600';
+      case 'doctor':
+        return 'from-purple-500 to-purple-600';
+      case 'secretary':
+        return 'from-pink-500 to-pink-600';
+      default:
+        return 'from-gray-500 to-gray-600';
     }
   };
 
@@ -80,25 +102,12 @@ export function ProfileModal({ isOpen, onClose, user }: ProfileModalProps) {
     switch (role) {
       case 'admin':
         return 'Administrateur';
-      case 'medecin':
+      case 'doctor':
         return 'Médecin';
-      case 'secretaire':
+      case 'secretary':
         return 'Secrétaire';
       default:
         return role;
-    }
-  };
-
-  const getRoleColor = (role: string) => {
-    switch (role) {
-      case 'admin':
-        return 'from-purple-500 to-pink-500';
-      case 'medecin':
-        return 'from-blue-500 to-cyan-500';
-      case 'secretaire':
-        return 'from-green-500 to-emerald-500';
-      default:
-        return 'from-gray-500 to-gray-600';
     }
   };
 
@@ -110,29 +119,29 @@ export function ProfileModal({ isOpen, onClose, user }: ProfileModalProps) {
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
-        className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-[200] p-4"
+        className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4"
         onClick={onClose}
       >
         <motion.div
-          initial={{ opacity: 0, scale: 0.95, y: 20 }}
-          animate={{ opacity: 1, scale: 1, y: 0 }}
-          exit={{ opacity: 0, scale: 0.95, y: 20 }}
+          initial={{ scale: 0.9, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          exit={{ scale: 0.9, opacity: 0 }}
           onClick={(e) => e.stopPropagation()}
           className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col"
         >
           {/* Header */}
-          <div className={`bg-gradient-to-r ${getRoleColor(user.role)} p-6 text-white`}>
+          <div className={`bg-gradient-to-r ${getRoleColor(profile.role)} p-6 text-white`}>
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-4">
                 <div className="w-16 h-16 bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center text-2xl">
-                  {user.prenom[0]}{user.nom[0]}
+                  {prenom[0]}{nom[0]}
                 </div>
                 <div>
                   <h2 className="text-2xl mb-1">
-                    {user.role === 'medecin' && 'Dr. '}
-                    {user.nom} {user.prenom}
+                    {profile.role === 'doctor' && 'Dr. '}
+                    {profile.name}
                   </h2>
-                  <p className="text-white/80 text-sm">{getRoleLabel(user.role)}</p>
+                  <p className="text-white/80 text-sm">{getRoleLabel(profile.role)}</p>
                 </div>
               </div>
               <button
@@ -145,219 +154,204 @@ export function ProfileModal({ isOpen, onClose, user }: ProfileModalProps) {
           </div>
 
           {/* Tabs */}
-          <div className="flex border-b border-gray-200 bg-gray-50">
+          <div className="flex border-b border-gray-200">
             <button
               onClick={() => setActiveTab('info')}
-              className={`flex-1 px-6 py-4 flex items-center justify-center gap-2 transition-colors ${
+              className={`flex-1 px-6 py-3 text-center font-medium transition-colors ${
                 activeTab === 'info'
-                  ? 'bg-white text-purple-600 border-b-2 border-purple-600'
-                  : 'text-gray-600 hover:text-gray-900'
+                  ? 'text-blue-600 border-b-2 border-blue-600'
+                  : 'text-gray-500 hover:text-gray-700'
               }`}
             >
-              <User className="w-5 h-5" />
-              <span>Informations</span>
+              <User className="w-5 h-5 inline mr-2" />
+              Informations
             </button>
             <button
               onClick={() => setActiveTab('password')}
-              className={`flex-1 px-6 py-4 flex items-center justify-center gap-2 transition-colors ${
+              className={`flex-1 px-6 py-3 text-center font-medium transition-colors ${
                 activeTab === 'password'
-                  ? 'bg-white text-purple-600 border-b-2 border-purple-600'
-                  : 'text-gray-600 hover:text-gray-900'
+                  ? 'text-blue-600 border-b-2 border-blue-600'
+                  : 'text-gray-500 hover:text-gray-700'
               }`}
             >
-              <Lock className="w-5 h-5" />
-              <span>Mot de passe</span>
+              <Lock className="w-5 h-5 inline mr-2" />
+              Mot de passe
             </button>
           </div>
 
           {/* Content */}
           <div className="flex-1 overflow-y-auto p-6">
-            <AnimatePresence mode="wait">
-              {activeTab === 'info' && (
-                <motion.div
-                  key="info"
-                  initial={{ opacity: 0, x: -20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  exit={{ opacity: 0, x: 20 }}
-                  className="space-y-4"
-                >
-                  <div className="bg-gradient-to-br from-purple-50 to-pink-50 rounded-xl p-6 border border-purple-200">
-                    <div className="space-y-4">
-                      {/* Email */}
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 bg-white rounded-lg flex items-center justify-center text-purple-600">
-                          <Mail className="w-5 h-5" />
-                        </div>
-                        <div className="flex-1">
-                          <p className="text-xs text-gray-500 mb-0.5">Email</p>
-                          <p className="text-gray-900">{user.email}</p>
-                        </div>
-                      </div>
+            {activeTab === 'info' && (
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm text-gray-600 mb-2">
+                    <Mail className="w-4 h-4 inline mr-2" />
+                    Email
+                  </label>
+                  <input
+                    type="email"
+                    value={profile.email}
+                    disabled
+                    className="w-full px-4 py-2 bg-gray-100 border border-gray-200 rounded-lg"
+                  />
+                </div>
 
-                      {/* Phone */}
-                      {user.telephone && (
-                        <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 bg-white rounded-lg flex items-center justify-center text-purple-600">
-                            <Phone className="w-5 h-5" />
-                          </div>
-                          <div className="flex-1">
-                            <p className="text-xs text-gray-500 mb-0.5">Téléphone</p>
-                            <p className="text-gray-900">{user.telephone}</p>
-                          </div>
-                        </div>
-                      )}
+                <div>
+                  <label className="block text-sm text-gray-600 mb-2">
+                    <User className="w-4 h-4 inline mr-2" />
+                    Nom complet
+                  </label>
+                  <input
+                    type="text"
+                    value={profile.name}
+                    disabled
+                    className="w-full px-4 py-2 bg-gray-100 border border-gray-200 rounded-lg"
+                  />
+                </div>
 
-                      {/* Role */}
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 bg-white rounded-lg flex items-center justify-center text-purple-600">
-                          <Briefcase className="w-5 h-5" />
-                        </div>
-                        <div className="flex-1">
-                          <p className="text-xs text-gray-500 mb-0.5">Rôle</p>
-                          <p className="text-gray-900">{getRoleLabel(user.role)}</p>
-                        </div>
-                      </div>
-
-                      {/* Specialty (for doctors) */}
-                      {user.role === 'medecin' && user.specialite && (
-                        <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 bg-white rounded-lg flex items-center justify-center text-purple-600">
-                            <Stethoscope className="w-5 h-5" />
-                          </div>
-                          <div className="flex-1">
-                            <p className="text-xs text-gray-500 mb-0.5">Spécialité</p>
-                            <p className="text-gray-900">{user.specialite}</p>
-                          </div>
-                        </div>
-                      )}
-
-                      {/* Doctor Code */}
-                      {user.doctorCode && (
-                        <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 bg-white rounded-lg flex items-center justify-center text-purple-600">
-                            <User className="w-5 h-5" />
-                          </div>
-                          <div className="flex-1">
-                            <p className="text-xs text-gray-500 mb-0.5">Code</p>
-                            <p className="text-gray-900">{user.doctorCode}</p>
-                          </div>
-                        </div>
-                      )}
-                    </div>
+                {profile.phone && (
+                  <div>
+                    <label className="block text-sm text-gray-600 mb-2">
+                      <Phone className="w-4 h-4 inline mr-2" />
+                      Téléphone
+                    </label>
+                    <input
+                      type="tel"
+                      value={profile.phone}
+                      disabled
+                      className="w-full px-4 py-2 bg-gray-100 border border-gray-200 rounded-lg"
+                    />
                   </div>
-                </motion.div>
-              )}
+                )}
 
-              {activeTab === 'password' && (
-                <motion.div
-                  key="password"
-                  initial={{ opacity: 0, x: -20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  exit={{ opacity: 0, x: 20 }}
-                  className="space-y-6"
-                >
-                  <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 flex items-start gap-3">
-                    <Lock className="w-5 h-5 text-blue-600 mt-0.5" />
-                    <div>
-                      <p className="text-sm text-blue-900">
-                        Pour modifier votre mot de passe, vous devez d'abord entrer votre mot de passe actuel.
-                        Le nouveau mot de passe doit contenir au moins 6 caractères.
-                      </p>
-                    </div>
+                {profile.specialty && (
+                  <div>
+                    <label className="block text-sm text-gray-600 mb-2">
+                      <Stethoscope className="w-4 h-4 inline mr-2" />
+                      Spécialité
+                    </label>
+                    <input
+                      type="text"
+                      value={profile.specialty}
+                      disabled
+                      className="w-full px-4 py-2 bg-gray-100 border border-gray-200 rounded-lg"
+                    />
                   </div>
+                )}
 
-                  <div className="space-y-4">
-                    {/* Current Password */}
-                    <div>
-                      <label className="block text-sm text-gray-700 mb-2">
-                        Mot de passe actuel
-                      </label>
-                      <div className="relative">
-                        <input
-                          type={showCurrentPassword ? 'text' : 'password'}
-                          value={currentPassword}
-                          onChange={(e) => setCurrentPassword(e.target.value)}
-                          className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500"
-                          placeholder="Entrez votre mot de passe actuel"
-                        />
-                        <button
-                          type="button"
-                          onClick={() => setShowCurrentPassword(!showCurrentPassword)}
-                          className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                        >
-                          {showCurrentPassword ? (
-                            <EyeOff className="w-5 h-5" />
-                          ) : (
-                            <Eye className="w-5 h-5" />
-                          )}
-                        </button>
-                      </div>
-                    </div>
+                {profile.address && (
+                  <div>
+                    <label className="block text-sm text-gray-600 mb-2">
+                      <Briefcase className="w-4 h-4 inline mr-2" />
+                      Adresse
+                    </label>
+                    <input
+                      type="text"
+                      value={profile.address}
+                      disabled
+                      className="w-full px-4 py-2 bg-gray-100 border border-gray-200 rounded-lg"
+                    />
+                  </div>
+                )}
 
-                    {/* New Password */}
-                    <div>
-                      <label className="block text-sm text-gray-700 mb-2">
-                        Nouveau mot de passe
-                      </label>
-                      <div className="relative">
-                        <input
-                          type={showNewPassword ? 'text' : 'password'}
-                          value={newPassword}
-                          onChange={(e) => setNewPassword(e.target.value)}
-                          className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500"
-                          placeholder="Entrez le nouveau mot de passe"
-                        />
-                        <button
-                          type="button"
-                          onClick={() => setShowNewPassword(!showNewPassword)}
-                          className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                        >
-                          {showNewPassword ? (
-                            <EyeOff className="w-5 h-5" />
-                          ) : (
-                            <Eye className="w-5 h-5" />
-                          )}
-                        </button>
-                      </div>
-                    </div>
+                <div className="mt-6 p-4 bg-blue-50 rounded-lg">
+                  <p className="text-sm text-gray-600">
+                    ℹ️ Pour modifier vos informations personnelles, veuillez contacter l'administrateur.
+                  </p>
+                </div>
+              </div>
+            )}
 
-                    {/* Confirm Password */}
-                    <div>
-                      <label className="block text-sm text-gray-700 mb-2">
-                        Confirmer le nouveau mot de passe
-                      </label>
-                      <div className="relative">
-                        <input
-                          type={showConfirmPassword ? 'text' : 'password'}
-                          value={confirmPassword}
-                          onChange={(e) => setConfirmPassword(e.target.value)}
-                          className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500"
-                          placeholder="Confirmez le nouveau mot de passe"
-                        />
-                        <button
-                          type="button"
-                          onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                          className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                        >
-                          {showConfirmPassword ? (
-                            <EyeOff className="w-5 h-5" />
-                          ) : (
-                            <Eye className="w-5 h-5" />
-                          )}
-                        </button>
-                      </div>
-                    </div>
-
+            {activeTab === 'password' && (
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm text-gray-600 mb-2">
+                    Mot de passe actuel
+                  </label>
+                  <div className="relative">
+                    <input
+                      type={showCurrentPassword ? 'text' : 'password'}
+                      value={currentPassword}
+                      onChange={(e) => setCurrentPassword(e.target.value)}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg pr-10"
+                      placeholder="Entrez votre mot de passe actuel"
+                    />
                     <button
-                      onClick={handlePasswordChange}
-                      className="w-full px-6 py-3 bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-xl hover:shadow-lg transition-all"
+                      type="button"
+                      onClick={() => setShowCurrentPassword(!showCurrentPassword)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
                     >
-                      Modifier le mot de passe
+                      {showCurrentPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
                     </button>
                   </div>
-                </motion.div>
-              )}
-            </AnimatePresence>
+                </div>
+
+                <div>
+                  <label className="block text-sm text-gray-600 mb-2">
+                    Nouveau mot de passe
+                  </label>
+                  <div className="relative">
+                    <input
+                      type={showNewPassword ? 'text' : 'password'}
+                      value={newPassword}
+                      onChange={(e) => setNewPassword(e.target.value)}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg pr-10"
+                      placeholder="Entrez le nouveau mot de passe"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowNewPassword(!showNewPassword)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                    >
+                      {showNewPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                    </button>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm text-gray-600 mb-2">
+                    Confirmer le mot de passe
+                  </label>
+                  <div className="relative">
+                    <input
+                      type={showConfirmPassword ? 'text' : 'password'}
+                      value={confirmPassword}
+                      onChange={(e) => setConfirmPassword(e.target.value)}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg pr-10"
+                      placeholder="Confirmez le nouveau mot de passe"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                    >
+                      {showConfirmPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                    </button>
+                  </div>
+                </div>
+
+                <button
+                  onClick={handlePasswordChange}
+                  disabled={loading}
+                  className="w-full bg-blue-500 text-white px-6 py-3 rounded-lg hover:bg-blue-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {loading ? (
+                    <div className="flex items-center justify-center gap-2">
+                      <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                      Modification en cours...
+                    </div>
+                  ) : (
+                    'Modifier le mot de passe'
+                  )}
+                </button>
+
+                <div className="mt-6 p-4 bg-amber-50 rounded-lg">
+                  <p className="text-sm text-gray-600">
+                    ⚠️ Le mot de passe doit contenir au moins 6 caractères.
+                  </p>
+                </div>
+              </div>
+            )}
           </div>
         </motion.div>
       </motion.div>

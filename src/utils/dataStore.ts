@@ -475,16 +475,71 @@ class DataStore {
 
   // Données par défaut
   private getDefaultUsers(): User[] {
-    // ⚠️ DÉSACTIVÉ - L'application utilise maintenant Supabase
-    // Les utilisateurs sont créés directement dans Supabase Auth
-    return [];
+    return [
+      {
+        id: 'admin-1',
+        email: 'admin@medicab.tn',
+        password: 'admin123',
+        name: 'Administrateur',
+        role: 'admin',
+        phone: '+216 71 123 456',
+        address: 'Tunis, Tunisie',
+        status: 'active',
+        createdAt: '2024-01-01T10:00:00Z',
+      },
+      {
+        id: 'doctor-1',
+        email: 'dr.ben.ali@medicab.tn',
+        password: 'doctor123',
+        name: 'Dr. Ahmed Ben Ali',
+        role: 'doctor',
+        phone: '+216 98 765 432',
+        address: 'Cabinet Médical, Avenue Habib Bourguiba, Tunis',
+        specialty: 'Médecine générale',
+        status: 'active',
+        createdAt: '2024-01-01T10:00:00Z',
+      },
+      {
+        id: 'secretary-1',
+        email: 'fatma.sec@medicab.tn',
+        password: 'secretary123',
+        name: 'Fatma Trabelsi',
+        role: 'secretary',
+        phone: '+216 22 345 678',
+        address: 'Tunis, Tunisie',
+        status: 'active',
+        assignedDoctorId: 'doctor-1',
+        createdAt: '2024-01-01T10:00:00Z',
+      },
+    ];
   }
 
   // Initialiser les données par défaut si nécessaire
   initialize(): void {
-    // ⚠️ DÉSACTIVÉ - L'application utilise maintenant Supabase
-    // Pas besoin d'initialiser localStorage
-    console.log('ℹ️  dataStore.initialize() désactivé - Utilisation de Supabase');
+    if (!this.getData('users')) {
+      this.setData('users', this.getDefaultUsers());
+    }
+    if (!this.getData('patients')) {
+      this.setData('patients', []);
+    }
+    if (!this.getData('appointments')) {
+      this.setData('appointments', []);
+    }
+    if (!this.getData('consultations')) {
+      this.setData('consultations', []);
+    }
+    if (!this.getData('chatMessages')) {
+      this.setData('chatMessages', []);
+    }
+    if (!this.getData('referralLetters')) {
+      this.setData('referralLetters', []);
+    }
+    if (!this.getData('notifications')) {
+      this.setData('notifications', []);
+    }
+    if (!this.getData('revenues')) {
+      this.setData('revenues', []);
+    }
   }
 
   // Réinitialiser toutes les données
@@ -495,7 +550,7 @@ class DataStore {
         localStorage.removeItem(key);
       }
     });
-    console.log('✅ localStorage nettoyé');
+    this.initialize();
   }
 }
 

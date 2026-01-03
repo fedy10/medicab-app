@@ -1,409 +1,260 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { motion } from 'motion/react';
-import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
-import { TrendingUp, TrendingDown, Calendar, DollarSign, Users } from 'lucide-react';
-
-interface Payment {
-  id: string;
-  date: string;
-  duration: number;
-  amount: number;
-  doctorId: string;
-  doctorName?: string;
-}
+import { DollarSign, TrendingUp, Users, Calendar, ChevronDown, ChevronUp } from 'lucide-react';
+import { useProfiles } from '../../hooks/useSupabase';
+import { useAppointments } from '../../hooks/useSupabase';
 
 export function AdminRevenueView() {
-  const [payments, setPayments] = useState<Payment[]>([]);
-  const [period, setPeriod] = useState<'day' | 'week' | 'month' | 'year'>('month');
+  const [expandedDoctor, setExpandedDoctor] = useState<string | null>(null);
+  const [selectedPeriod, setSelectedPeriod] = useState<'month' | 'year'>('month');
 
-  useEffect(() => {
-    loadAllPayments();
-  }, []);
+  // Charger tous les médecins
+  const { doctors, loading: doctorsLoading } = useProfiles();
 
-  const loadAllPayments = () => {
-    try {
-      const usersData = localStorage.getItem('demo_users');
-      if (!usersData) {
-        setPayments([]);
-        return;
-      }
+  // Fonction pour charger les rendez-vous d'un médecin
+  const DoctorRevenueRow = ({ doctor }: { doctor: any }) => {
+    const { appointments, loading } = useAppointments(doctor.id);
+    
+    // Calculer les revenus à partir des rendez-vous complétés
+    const completedAppointments = appointments.filter(apt => 
+      apt.status === 'completed' && apt.payment_amount && apt.payment_amount > 0
+    );
 
-      const users = JSON.parse(usersData);
-      const doctors = users.filter((u: any) => u.role === 'medecin');
-      
-      const allPayments: Payment[] = [];
-      
-      doctors.forEach((doctor: any) => {
-        const key = `payments_${doctor.id}`;
-        const stored = localStorage.getItem(key);
-        if (stored) {
-          const doctorPayments = JSON.parse(stored);
-          doctorPayments.forEach((payment: any) => {
-            allPayments.push({
-              ...payment,
-              doctorId: doctor.id,
-              doctorName: `Dr. ${doctor.nom} ${doctor.prenom}`,
-            });
-          });
-        }
-      });
+    const totalRevenue = completedAppointments.reduce((sum, apt) => sum + (apt.payment_amount || 0), 0);
+    const totalConsultations = completedAppointments.length;
 
-      // Sort by date descending
-      allPayments.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-      setPayments(allPayments);
-    } catch (error) {
-      console.error('Error loading payments:', error);
-      setPayments([]);
-    }
+    // Revenus du mois en cours
+    const currentMonth = new Date().getMonth();
+    const currentYear = new Date().getFullYear();
+    const monthlyRevenue = completedAppointments
+      .filter(apt => {
+        const aptDate = new Date(apt.date);
+        return aptDate.getMonth() === currentMonth && aptDate.getFullYear() === currentYear;
+      })
+      .reduce((sum, apt) => sum + (apt.payment_amount || 0), 0);
+
+    const isExpanded = expandedDoctor === doctor.id;
+
+    return (
+      <div key={doctor.id} className="bg-white rounded-xl shadow-lg overflow-hidden">
+        {/* Doctor Header */}
+        <div
+          className="p-6 cursor-pointer hover:bg-gray-50 transition-colors"
+          onClick={() => setExpandedDoctor(isExpanded ? null : doctor.id)}
+        >
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white">
+                {doctor.name.split(' ').map((n: string) => n[0]).join('').substring(0, 2)}
+              </div>
+              <div>
+                <h3 className="text-gray-900 font-medium">Dr. {doctor.name}</h3>
+                <p className="text-sm text-gray-500">{doctor.specialty || 'Médecin généraliste'}</p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-6">
+              <div className="text-right">
+                <p className="text-sm text-gray-600">Ce mois</p>
+                <p className="text-xl font-bold text-gray-900">{monthlyRevenue.toFixed(2)} DT</p>
+              </div>
+              <div className="text-right">
+                <p className="text-sm text-gray-600">Total</p>
+                <p className="text-xl font-bold text-blue-600">{totalRevenue.toFixed(2)} DT</p>
+              </div>
+              <div className="text-right">
+                <p className="text-sm text-gray-600">Consultations</p>
+                <p className="text-xl font-bold text-purple-600">{totalConsultations}</p>
+              </div>
+              {isExpanded ? <ChevronUp className="w-5 h-5 text-gray-400" /> : <ChevronDown className="w-5 h-5 text-gray-400" />}
+            </div>
+          </div>
+        </div>
+
+        {/* Expanded Details */}
+        {isExpanded && (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: 'auto' }}
+            exit={{ opacity: 0, height: 0 }}
+            className="border-t border-gray-200 p-6 bg-gray-50"
+          >
+            {loading ? (
+              <div className="text-center py-4">
+                <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto"></div>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                <h4 className="font-medium text-gray-900">Transactions Récentes</h4>
+                <div className="space-y-2 max-h-64 overflow-y-auto">
+                  {completedAppointments.slice(-10).reverse().map((apt) => (
+                    <div key={apt.id} className="flex items-center justify-between p-3 bg-white rounded-lg">
+                      <div>
+                        <p className="font-medium text-gray-900">{apt.patient_name}</p>
+                        <p className="text-sm text-gray-500">
+                          {new Date(apt.date).toLocaleDateString('fr-FR')} • {apt.time}
+                        </p>
+                      </div>
+                      <div className="text-right">
+                        <p className="font-bold text-gray-900">{apt.payment_amount} DT</p>
+                        <p className="text-xs text-gray-500 capitalize">{apt.payment_type || 'normal'}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                {completedAppointments.length === 0 && (
+                  <div className="text-center py-8 text-gray-400">
+                    <DollarSign className="w-12 h-12 mx-auto mb-2" />
+                    <p>Aucune transaction</p>
+                  </div>
+                )}
+              </div>
+            )}
+          </motion.div>
+        )}
+      </div>
+    );
   };
 
-  // Calculate stats
-  const today = new Date();
-  const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
-  const startOfYear = new Date(today.getFullYear(), 0, 1);
+  // Calculer les stats globales
+  const GlobalStats = () => {
+    // Pour chaque médecin, charger les rendez-vous
+    const allDoctorsData = doctors.map(doctor => {
+      // eslint-disable-next-line react-hooks/rules-of-hooks
+      const { appointments } = useAppointments(doctor.id);
+      const completedAppointments = appointments.filter(apt => 
+        apt.status === 'completed' && apt.payment_amount && apt.payment_amount > 0
+      );
+      const totalRevenue = completedAppointments.reduce((sum, apt) => sum + (apt.payment_amount || 0), 0);
+      return { doctor, totalRevenue, consultations: completedAppointments.length };
+    });
 
-  const todayPayments = payments.filter(p => {
-    const paymentDate = new Date(p.date);
-    return paymentDate.toDateString() === today.toDateString();
-  });
+    const globalRevenue = allDoctorsData.reduce((sum, d) => sum + d.totalRevenue, 0);
+    const globalConsultations = allDoctorsData.reduce((sum, d) => sum + d.consultations, 0);
+    const activeDoctors = allDoctorsData.filter(d => d.totalRevenue > 0).length;
 
-  const monthPayments = payments.filter(p => {
-    const paymentDate = new Date(p.date);
-    return paymentDate >= startOfMonth;
-  });
+    return (
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="bg-white rounded-xl shadow-lg p-6"
+        >
+          <div className="flex items-center justify-between mb-4">
+            <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
+              <DollarSign className="w-6 h-6 text-blue-600" />
+            </div>
+          </div>
+          <p className="text-sm text-gray-600 mb-1">Revenu Total</p>
+          <p className="text-2xl font-bold text-gray-900">{globalRevenue.toFixed(2)} DT</p>
+        </motion.div>
 
-  const yearPayments = payments.filter(p => {
-    const paymentDate = new Date(p.date);
-    return paymentDate >= startOfYear;
-  });
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.1 }}
+          className="bg-white rounded-xl shadow-lg p-6"
+        >
+          <div className="flex items-center justify-between mb-4">
+            <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
+              <Users className="w-6 h-6 text-green-600" />
+            </div>
+          </div>
+          <p className="text-sm text-gray-600 mb-1">Médecins Actifs</p>
+          <p className="text-2xl font-bold text-gray-900">{activeDoctors}</p>
+        </motion.div>
 
-  const totalToday = todayPayments.reduce((sum, p) => sum + p.amount, 0);
-  const totalMonth = monthPayments.reduce((sum, p) => sum + p.amount, 0);
-  const totalYear = yearPayments.reduce((sum, p) => sum + p.amount, 0);
-  const totalAll = payments.reduce((sum, p) => sum + p.amount, 0);
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.2 }}
+          className="bg-white rounded-xl shadow-lg p-6"
+        >
+          <div className="flex items-center justify-between mb-4">
+            <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center">
+              <Calendar className="w-6 h-6 text-purple-600" />
+            </div>
+          </div>
+          <p className="text-sm text-gray-600 mb-1">Total Consultations</p>
+          <p className="text-2xl font-bold text-gray-900">{globalConsultations}</p>
+        </motion.div>
 
-  // Group payments by doctor
-  const paymentsByDoctor = payments.reduce((acc: any, payment) => {
-    const doctorName = payment.doctorName || 'Inconnu';
-    if (!acc[doctorName]) {
-      acc[doctorName] = { name: doctorName, total: 0, count: 0 };
-    }
-    acc[doctorName].total += payment.amount;
-    acc[doctorName].count += 1;
-    return acc;
-  }, {});
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.3 }}
+          className="bg-white rounded-xl shadow-lg p-6"
+        >
+          <div className="flex items-center justify-between mb-4">
+            <div className="w-12 h-12 bg-orange-100 rounded-lg flex items-center justify-center">
+              <TrendingUp className="w-6 h-6 text-orange-600" />
+            </div>
+          </div>
+          <p className="text-sm text-gray-600 mb-1">Moyenne/Médecin</p>
+          <p className="text-2xl font-bold text-gray-900">
+            {activeDoctors > 0 ? (globalRevenue / activeDoctors).toFixed(2) : '0.00'} DT
+          </p>
+        </motion.div>
+      </div>
+    );
+  };
 
-  const doctorChartData = Object.values(paymentsByDoctor).sort((a: any, b: any) => b.total - a.total);
-
-  // Group payments by month
-  const paymentsByMonth: any = {};
-  yearPayments.forEach(payment => {
-    const date = new Date(payment.date);
-    const monthKey = date.toLocaleDateString('fr-FR', { month: 'short' });
-    if (!paymentsByMonth[monthKey]) {
-      paymentsByMonth[monthKey] = 0;
-    }
-    paymentsByMonth[monthKey] += payment.amount;
-  });
-
-  const monthlyChartData = [
-    { month: 'Jan', revenue: paymentsByMonth['janv.'] || 0 },
-    { month: 'Fév', revenue: paymentsByMonth['févr.'] || 0 },
-    { month: 'Mar', revenue: paymentsByMonth['mars'] || 0 },
-    { month: 'Avr', revenue: paymentsByMonth['avr.'] || 0 },
-    { month: 'Mai', revenue: paymentsByMonth['mai'] || 0 },
-    { month: 'Jun', revenue: paymentsByMonth['juin'] || 0 },
-    { month: 'Jul', revenue: paymentsByMonth['juil.'] || 0 },
-    { month: 'Aoû', revenue: paymentsByMonth['août'] || 0 },
-    { month: 'Sep', revenue: paymentsByMonth['sept.'] || 0 },
-    { month: 'Oct', revenue: paymentsByMonth['oct.'] || 0 },
-    { month: 'Nov', revenue: paymentsByMonth['nov.'] || 0 },
-    { month: 'Déc', revenue: paymentsByMonth['déc.'] || 0 },
-  ];
-
-  const stats = [
-    {
-      label: 'Aujourd\'hui',
-      value: `${totalToday.toFixed(2)} TND`,
-      count: todayPayments.length,
-      color: 'from-blue-500 to-cyan-500',
-    },
-    {
-      label: 'Ce mois',
-      value: `${totalMonth.toFixed(2)} TND`,
-      count: monthPayments.length,
-      color: 'from-purple-500 to-pink-500',
-    },
-    {
-      label: 'Cette année',
-      value: `${totalYear.toFixed(2)} TND`,
-      count: yearPayments.length,
-      color: 'from-orange-500 to-amber-500',
-    },
-    {
-      label: 'Total',
-      value: `${totalAll.toFixed(2)} TND`,
-      count: payments.length,
-      color: 'from-green-500 to-emerald-500',
-    },
-  ];
-
-  const COLORS = ['#3b82f6', '#8b5cf6', '#ec4899', '#f59e0b', '#10b981', '#06b6d4'];
+  if (doctorsLoading) {
+    return (
+      <div className="text-center py-12">
+        <div className="w-16 h-16 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+        <p className="text-gray-600">Chargement des revenus...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
-      {/* Period selector */}
-      <div className="bg-white rounded-2xl p-6 shadow-lg border border-gray-100">
-        <div className="flex items-center justify-between flex-wrap gap-4">
-          <h3 className="text-gray-900">Analyse des revenus globaux</h3>
-          <div className="flex gap-2">
-            {(['day', 'week', 'month', 'year'] as const).map((p) => (
-              <button
-                key={p}
-                onClick={() => setPeriod(p)}
-                className={`px-4 py-2 rounded-xl transition-all ${
-                  period === p
-                    ? 'bg-gradient-to-r from-blue-500 to-purple-600 text-white'
-                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                }`}
-              >
-                {p === 'day' ? 'Jour' : p === 'week' ? 'Semaine' : p === 'month' ? 'Mois' : 'Année'}
-              </button>
-            ))}
-          </div>
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <h2 className="text-gray-900">Revenus Globaux</h2>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setSelectedPeriod('month')}
+            className={`px-4 py-2 rounded-lg transition-all ${
+              selectedPeriod === 'month'
+                ? 'bg-blue-500 text-white'
+                : 'bg-white text-gray-600 hover:bg-gray-100'
+            }`}
+          >
+            Ce Mois
+          </button>
+          <button
+            onClick={() => setSelectedPeriod('year')}
+            className={`px-4 py-2 rounded-lg transition-all ${
+              selectedPeriod === 'year'
+                ? 'bg-blue-500 text-white'
+                : 'bg-white text-gray-600 hover:bg-gray-100'
+            }`}
+          >
+            Cette Année
+          </button>
         </div>
       </div>
 
-      {/* Stats cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        {stats.map((stat, index) => (
-          <motion.div
-            key={stat.label}
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: index * 0.1 }}
-            whileHover={{ scale: 1.02, y: -5 }}
-            className="bg-white rounded-2xl p-6 shadow-lg border border-gray-100"
-          >
-            <div className="flex items-start justify-between mb-4">
-              <div className={`w-12 h-12 rounded-xl bg-gradient-to-br ${stat.color} flex items-center justify-center`}>
-                <DollarSign className="w-6 h-6 text-white" />
-              </div>
-              <div className="text-right">
-                <p className="text-xs text-gray-500">{stat.count} paiement{stat.count > 1 ? 's' : ''}</p>
-              </div>
-            </div>
-            <p className="text-sm text-gray-600 mb-1">{stat.label}</p>
-            <p className="text-gray-900">{stat.value}</p>
-          </motion.div>
+      {/* Global Stats */}
+      <GlobalStats />
+
+      {/* Doctors List */}
+      <div className="space-y-4">
+        <h3 className="text-gray-900">Revenus par Médecin</h3>
+        {doctors.filter(d => d.status === 'active').map((doctor) => (
+          <DoctorRevenueRow key={doctor.id} doctor={doctor} />
         ))}
       </div>
 
-      {/* Charts */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Revenue by doctor - Bar chart */}
-        <motion.div
-          initial={{ opacity: 0, scale: 0.95 }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={{ delay: 0.4 }}
-          className="bg-white rounded-2xl p-6 shadow-lg border border-gray-100"
-        >
-          <h4 className="text-gray-900 mb-4">Revenus par médecin</h4>
-          {doctorChartData.length === 0 ? (
-            <div className="flex flex-col items-center justify-center h-[300px] text-gray-400">
-              <Users className="w-16 h-16 mb-4" />
-              <p>Aucun paiement enregistré</p>
-            </div>
-          ) : (
-            <ResponsiveContainer width="100%" height={300}>
-              <BarChart data={doctorChartData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                <XAxis 
-                  dataKey="name" 
-                  stroke="#9ca3af"
-                  angle={-45}
-                  textAnchor="end"
-                  height={100}
-                  interval={0}
-                />
-                <YAxis stroke="#9ca3af" />
-                <Tooltip
-                  contentStyle={{
-                    backgroundColor: 'white',
-                    border: '1px solid #e5e7eb',
-                    borderRadius: '12px',
-                    padding: '12px',
-                  }}
-                  formatter={(value: any) => [`${value.toFixed(2)} TND`, 'Montant']}
-                />
-                <Bar dataKey="total" fill="url(#colorRevenue)" radius={[8, 8, 0, 0]} />
-                <defs>
-                  <linearGradient id="colorRevenue" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="#3b82f6" />
-                    <stop offset="100%" stopColor="#8b5cf6" />
-                  </linearGradient>
-                </defs>
-              </BarChart>
-            </ResponsiveContainer>
-          )}
-        </motion.div>
-
-        {/* Revenue by doctor - Pie chart */}
-        <motion.div
-          initial={{ opacity: 0, scale: 0.95 }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={{ delay: 0.5 }}
-          className="bg-white rounded-2xl p-6 shadow-lg border border-gray-100"
-        >
-          <h4 className="text-gray-900 mb-4">Répartition des revenus</h4>
-          {doctorChartData.length === 0 ? (
-            <div className="flex flex-col items-center justify-center h-[300px] text-gray-400">
-              <DollarSign className="w-16 h-16 mb-4" />
-              <p>Aucun paiement enregistré</p>
-            </div>
-          ) : (
-            <>
-              <ResponsiveContainer width="100%" height={250}>
-                <PieChart>
-                  <Pie
-                    data={doctorChartData}
-                    cx="50%"
-                    cy="50%"
-                    labelLine={false}
-                    outerRadius={80}
-                    fill="#8884d8"
-                    dataKey="total"
-                    label={({ name, percent }: any) => `${(percent * 100).toFixed(0)}%`}
-                  >
-                    {doctorChartData.map((entry: any, index: number) => (
-                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                    ))}
-                  </Pie>
-                  <Tooltip
-                    formatter={(value: any) => `${value.toFixed(2)} TND`}
-                  />
-                </PieChart>
-              </ResponsiveContainer>
-              <div className="mt-4 space-y-2">
-                {doctorChartData.slice(0, 6).map((doctor: any, index: number) => (
-                  <div key={doctor.name} className="flex items-center justify-between text-sm">
-                    <div className="flex items-center gap-2">
-                      <div
-                        className="w-3 h-3 rounded-full"
-                        style={{ backgroundColor: COLORS[index % COLORS.length] }}
-                      />
-                      <span className="text-gray-700">{doctor.name}</span>
-                    </div>
-                    <span className="text-gray-900">{doctor.total.toFixed(2)} TND</span>
-                  </div>
-                ))}
-              </div>
-            </>
-          )}
-        </motion.div>
-      </div>
-
-      {/* Yearly trend */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.6 }}
-        className="bg-white rounded-2xl p-6 shadow-lg border border-gray-100"
-      >
-        <h4 className="text-gray-900 mb-4">Évolution mensuelle</h4>
-        {payments.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-[350px] text-gray-400">
-            <Calendar className="w-16 h-16 mb-4" />
-            <p>Aucun paiement enregistré</p>
-          </div>
-        ) : (
-          <ResponsiveContainer width="100%" height={350}>
-            <LineChart data={monthlyChartData}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-              <XAxis dataKey="month" stroke="#9ca3af" />
-              <YAxis stroke="#9ca3af" />
-              <Tooltip
-                contentStyle={{
-                  backgroundColor: 'white',
-                  border: '1px solid #e5e7eb',
-                  borderRadius: '12px',
-                  padding: '12px',
-                }}
-                formatter={(value: any) => `${value.toFixed(2)} TND`}
-              />
-              <Line
-                type="monotone"
-                dataKey="revenue"
-                stroke="#8b5cf6"
-                strokeWidth={3}
-                dot={{ fill: '#8b5cf6', r: 6 }}
-                activeDot={{ r: 8 }}
-              />
-            </LineChart>
-          </ResponsiveContainer>
-        )}
-      </motion.div>
-
-      {/* Recent Payments List */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.7 }}
-        className="bg-white rounded-2xl p-6 shadow-lg border border-gray-100"
-      >
-        <h4 className="text-gray-900 mb-4">Derniers paiements</h4>
-        {payments.length === 0 ? (
-          <div className="text-center py-12 text-gray-400">
-            <DollarSign className="w-12 h-12 mx-auto mb-3" />
-            <p>Aucun paiement enregistré</p>
-            <p className="text-sm mt-2">Les paiements ajoutés apparaîtront ici</p>
-          </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr className="border-b border-gray-200">
-                  <th className="text-left py-3 px-4 text-sm text-gray-600">Date</th>
-                  <th className="text-left py-3 px-4 text-sm text-gray-600">Médecin</th>
-                  <th className="text-left py-3 px-4 text-sm text-gray-600">Durée</th>
-                  <th className="text-right py-3 px-4 text-sm text-gray-600">Montant</th>
-                </tr>
-              </thead>
-              <tbody>
-                {payments.slice(0, 10).map((payment, index) => (
-                  <motion.tr
-                    key={payment.id}
-                    initial={{ opacity: 0, x: -20 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    transition={{ delay: 0.7 + index * 0.05 }}
-                    className="border-b border-gray-100 hover:bg-gray-50 transition-colors"
-                  >
-                    <td className="py-3 px-4 text-sm text-gray-900">
-                      {new Date(payment.date).toLocaleDateString('fr-FR', {
-                        day: '2-digit',
-                        month: 'short',
-                        year: 'numeric',
-                      })}
-                    </td>
-                    <td className="py-3 px-4 text-sm text-gray-900">{payment.doctorName}</td>
-                    <td className="py-3 px-4 text-sm text-gray-600">{payment.duration} mois</td>
-                    <td className="py-3 px-4 text-sm text-right">
-                      <span className="px-3 py-1 bg-green-100 text-green-700 rounded-lg">
-                        {payment.amount.toFixed(2)} TND
-                      </span>
-                    </td>
-                  </motion.tr>
-                ))}
-              </tbody>
-            </table>
-            {payments.length > 10 && (
-              <p className="text-center text-sm text-gray-500 mt-4">
-                Et {payments.length - 10} autres paiements...
-              </p>
-            )}
-          </div>
-        )}
-      </motion.div>
+      {doctors.filter(d => d.status === 'active').length === 0 && (
+        <div className="text-center py-12 bg-white rounded-xl shadow">
+          <Users className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+          <p className="text-gray-500">Aucun médecin actif</p>
+        </div>
+      )}
     </div>
   );
 }
