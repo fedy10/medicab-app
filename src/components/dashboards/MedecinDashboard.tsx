@@ -7,7 +7,7 @@ import { useUnreadMessages } from '../../hooks/useUnreadMessages';
 import { ProfileModal } from '../modals/ProfileModal';
 import { AnimatedBackground } from '../ui/AnimatedBackground';
 import { CalendarView } from '../doctor/CalendarView';
-import { ConsultationsView } from '../doctor/ConsultationsView';
+import { ConsultationsViewSupabase } from '../doctor/ConsultationsViewSupabase';
 import { PatientsView } from '../doctor/PatientsView';
 import { RevenueView } from '../doctor/RevenueView';
 import { ProfileView } from '../doctor/ProfileView';
@@ -162,7 +162,7 @@ export function MedecinDashboard({ user, profile, onLogout }: MedecinDashboardPr
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
           >
-            <ConsultationsView doctorId={profile.id} />
+            <ConsultationsViewSupabase doctorId={profile.id} doctorProfile={profile} />
           </motion.div>
         )}
 

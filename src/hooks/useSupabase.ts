@@ -8,7 +8,7 @@ import {
   chatService,
   referralService,
   notificationService,
-} from '../lib/services/supabaseService';
+} from '../lib/services';
 
 /**
  * Hook personnalisé pour charger et gérer les données Supabase

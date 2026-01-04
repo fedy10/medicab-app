@@ -221,7 +221,7 @@ export function PatientFileView({ patient, onClose, canUploadFiles = true }: Pat
         </div>
 
         {/* Diseases */}
-        {patient.diseases.length > 0 && (
+        {patient.diseases && patient.diseases.length > 0 && (
           <div className="mb-6">
             <ChronicDiseasesSelector
               selectedDiseases={patient.diseases}
@@ -236,8 +236,8 @@ export function PatientFileView({ patient, onClose, canUploadFiles = true }: Pat
         <div className="mb-6">
           <h3 className="text-gray-900 mb-4">Historique des consultations</h3>
           <div className="space-y-4 max-h-[400px] overflow-y-auto custom-scrollbar pr-2">
-            {patient.consultations.length > 0 ? (
-              patient.consultations.map((consult, i) => (
+            {consultations.length > 0 ? (
+              consultations.map((consult, i) => (
                 <motion.div
                   key={i}
                   initial={{ opacity: 0, x: -20 }}

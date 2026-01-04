@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { Check, X, Phone, MapPin, Mail, AlertCircle, UserCheck, Clock, Search, ChevronLeft, ChevronRight, Filter, DollarSign, AlertTriangle } from 'lucide-react';
 import { MedecinDetailsModal } from '../modals/MedecinDetailsModal';
 import { useProfiles } from '../../hooks/useSupabase';
-import { profileService, revenueService } from '../../lib/services/supabaseService';
+import { profileService, revenueService } from '../../lib/services';
 
 interface MedecinsManagementProps {
   onUpdate?: () => void;

@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { X, User, Mail, Phone, Lock, Eye, EyeOff, Stethoscope, Briefcase } from 'lucide-react';
-import { profileService } from '../../lib/services/supabaseService';
+import { profileService } from '../../lib/services';
 import { supabase } from '../../lib/supabase';
 
 interface ProfileModalProps {

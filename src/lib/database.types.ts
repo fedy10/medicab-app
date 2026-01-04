@@ -170,6 +170,10 @@ export interface Database {
           insurance_reimbursed_amount: number | null
           created_at: string
           updated_at: string
+          // Nouveaux champs pour analyses et imagerie
+          analysis: string | null
+          imaging: string | null
+          modification_history: Json | null
         }
         Insert: {
           id?: string
@@ -190,6 +194,9 @@ export interface Database {
           insurance_reimbursed_amount?: number | null
           created_at?: string
           updated_at?: string
+          analysis?: string | null
+          imaging?: string | null
+          modification_history?: Json | null
         }
         Update: {
           id?: string
@@ -210,6 +217,9 @@ export interface Database {
           insurance_reimbursed_amount?: number | null
           created_at?: string
           updated_at?: string
+          analysis?: string | null
+          imaging?: string | null
+          modification_history?: Json | null
         }
       }
       chat_messages: {
@@ -225,6 +235,10 @@ export interface Database {
           edited_at: string | null
           files: Json | null
           created_at: string
+          // Nouveaux champs pour les orientations
+          referral_id: string | null
+          message_type: 'normal' | 'system' | 'file_upload'
+          context: 'general' | 'referral'
         }
         Insert: {
           id?: string
@@ -238,6 +252,9 @@ export interface Database {
           edited_at?: string | null
           files?: Json | null
           created_at?: string
+          referral_id?: string | null
+          message_type?: 'normal' | 'system' | 'file_upload'
+          context?: 'general' | 'referral'
         }
         Update: {
           id?: string
@@ -251,6 +268,9 @@ export interface Database {
           edited_at?: string | null
           files?: Json | null
           created_at?: string
+          referral_id?: string | null
+          message_type?: 'normal' | 'system' | 'file_upload'
+          context?: 'general' | 'referral'
         }
       }
       referral_letters: {
@@ -270,6 +290,18 @@ export interface Database {
           chat_messages: Json | null
           created_at: string
           updated_at: string
+          // Nouveaux champs pour contexte patient
+          patient_phone: string | null
+          patient_age: number | null
+          patient_gender: 'male' | 'female' | null
+          patient_address: string | null
+          // Nouveaux champs pour orientation
+          reason: string | null
+          consultation_id: string | null
+          unread_messages: number
+          viewed_at: string | null
+          response_content: string | null
+          responded_at: string | null
         }
         Insert: {
           id?: string
@@ -287,6 +319,16 @@ export interface Database {
           chat_messages?: Json | null
           created_at?: string
           updated_at?: string
+          patient_phone?: string | null
+          patient_age?: number | null
+          patient_gender?: 'male' | 'female' | null
+          patient_address?: string | null
+          reason?: string | null
+          consultation_id?: string | null
+          unread_messages?: number
+          viewed_at?: string | null
+          response_content?: string | null
+          responded_at?: string | null
         }
         Update: {
           id?: string
@@ -304,6 +346,16 @@ export interface Database {
           chat_messages?: Json | null
           created_at?: string
           updated_at?: string
+          patient_phone?: string | null
+          patient_age?: number | null
+          patient_gender?: 'male' | 'female' | null
+          patient_address?: string | null
+          reason?: string | null
+          consultation_id?: string | null
+          unread_messages?: number
+          viewed_at?: string | null
+          response_content?: string | null
+          responded_at?: string | null
         }
       }
       notifications: {
@@ -316,6 +368,10 @@ export interface Database {
           read: boolean
           link: string | null
           created_at: string
+          // Nouveaux champs
+          referral_id: string | null
+          metadata: Json | null
+          action_date: string | null
         }
         Insert: {
           id?: string
@@ -326,6 +382,9 @@ export interface Database {
           read?: boolean
           link?: string | null
           created_at?: string
+          referral_id?: string | null
+          metadata?: Json | null
+          action_date?: string | null
         }
         Update: {
           id?: string
@@ -336,6 +395,9 @@ export interface Database {
           read?: boolean
           link?: string | null
           created_at?: string
+          referral_id?: string | null
+          metadata?: Json | null
+          action_date?: string | null
         }
       }
       revenues: {

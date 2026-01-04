@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
-import { authService } from '../lib/services/supabaseService';
+import { authService } from '../lib/services';
 import type { User } from '@supabase/supabase-js';
 import type { Database } from '../lib/database.types';
 

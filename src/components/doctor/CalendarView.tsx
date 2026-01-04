@@ -4,7 +4,7 @@ import { ChevronLeft, ChevronRight, Plus, Check, X, Clock, User, Edit, Trash2, C
 import { AppointmentConfirmation } from './AppointmentConfirmation';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { useAppointments, usePatients } from '../../hooks/useSupabase';
-import { patientService } from '../../lib/services/supabaseService';
+import { patientService } from '../../lib/services';
 import { supabase } from '../../lib/supabase';
 
 interface CalendarViewProps {
@@ -342,7 +342,11 @@ export function CalendarView({ doctorId }: CalendarViewProps) {
         console.log('✅ Utilisation du patient existant:', existingPatient.name);
       }
 
-      const appointmentDate = selectedDate.toISOString().split('T')[0];
+      // FIX: Utiliser la date locale au lieu de UTC pour éviter le décalage d'un jour
+      const year = selectedDate.getFullYear();
+      const month = String(selectedDate.getMonth() + 1).padStart(2, '0');
+      const day = String(selectedDate.getDate()).padStart(2, '0');
+      const appointmentDate = `${year}-${month}-${day}`;
       const time = `${newAppointment.hour}:${newAppointment.minute}`;
       
       await createAppointment({
@@ -565,36 +569,36 @@ export function CalendarView({ doctorId }: CalendarViewProps) {
         </motion.button>
       </div>
 
-      {/* Layout: Calendrier à gauche (compact) + Planning à droite */}
-      <div className="grid grid-cols-1 md:grid-cols-12 gap-4 md:gap-6">
-        {/* CALENDRIER - GAUCHE (3 colonnes - plus compact) */}
-        <div className="md:col-span-3 lg:col-span-3">
+      {/* Layout: Calendrier à gauche (RÉDUIT) + Planning à droite */}
+      <div className="flex flex-col lg:flex-row gap-4 items-start">
+        {/* CALENDRIER - GAUCHE (COMPACT: 280px) */}
+        <div className="w-full lg:w-[280px] flex-shrink-0">
           <motion.div
             initial={{ opacity: 0, x: -20 }}
             animate={{ opacity: 1, x: 0 }}
-            className="bg-white rounded-2xl shadow-xl p-4"
+            className="bg-white rounded-2xl shadow-xl p-3"
             style={{
               background: 'linear-gradient(135deg, #ffffff 0%, #fef3f8 100%)',
             }}
           >
             {/* Navigation mois */}
-            <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center justify-between mb-3">
               <motion.button
                 whileHover={{ scale: 1.1 }}
                 whileTap={{ scale: 0.9 }}
                 onClick={handlePreviousMonth}
-                className="p-2 hover:bg-purple-100 rounded-lg transition-colors"
+                className="p-1.5 hover:bg-purple-100 rounded-lg transition-colors"
               >
                 <ChevronLeft className="w-4 h-4 text-purple-600" />
               </motion.button>
-              <h3 className="text-base font-semibold text-gray-900">
+              <h3 className="text-sm font-semibold text-gray-900">
                 {monthNames[selectedDate.getMonth()]} {selectedDate.getFullYear()}
               </h3>
               <motion.button
                 whileHover={{ scale: 1.1 }}
                 whileTap={{ scale: 0.9 }}
                 onClick={handleNextMonth}
-                className="p-2 hover:bg-purple-100 rounded-lg transition-colors"
+                className="p-1.5 hover:bg-purple-100 rounded-lg transition-colors"
               >
                 <ChevronRight className="w-4 h-4 text-purple-600" />
               </motion.button>
@@ -603,13 +607,13 @@ export function CalendarView({ doctorId }: CalendarViewProps) {
             {/* Noms des jours */}
             <div className="grid grid-cols-7 gap-0.5 mb-1">
               {dayNames.map((day) => (
-                <div key={day} className="text-center text-xs font-medium text-gray-500 py-1">
+                <div key={day} className="text-center text-[10px] font-medium text-gray-500 py-0.5">
                   {day}
                 </div>
               ))}
             </div>
 
-            {/* Grille des jours */}
+            {/* Grille des jours - COMPACTE */}
             <div className="grid grid-cols-7 gap-0.5">
               {Array.from({ length: firstDayOfMonth }).map((_, index) => (
                 <div key={`empty-${index}`} className="aspect-square" />
@@ -629,7 +633,7 @@ export function CalendarView({ doctorId }: CalendarViewProps) {
                     whileHover={{ scale: 1.05 }}
                     whileTap={{ scale: 0.95 }}
                     onClick={() => handleDayClick(day)}
-                    className={`aspect-square rounded-lg p-0.5 text-xs transition-all relative flex flex-col items-center justify-center ${
+                    className={`aspect-square rounded-lg p-0.5 text-[11px] transition-all relative flex flex-col items-center justify-center ${
                       isSelected
                         ? 'bg-gradient-to-br from-purple-500 to-pink-600 text-white shadow-lg'
                         : isToday
@@ -639,11 +643,11 @@ export function CalendarView({ doctorId }: CalendarViewProps) {
                   >
                     <span>{day}</span>
                     {dayAppointments.length > 0 && (
-                      <div className="absolute bottom-1 flex gap-0.5">
+                      <div className="absolute bottom-0.5 flex gap-0.5">
                         {Array.from({ length: Math.min(dayAppointments.length, 3) }).map((_, i) => (
                           <div
                             key={i}
-                            className={`w-1 h-1 rounded-full ${
+                            className={`w-0.5 h-0.5 rounded-full ${
                               isSelected ? 'bg-white' : 'bg-purple-500'
                             }`}
                           />
@@ -657,18 +661,18 @@ export function CalendarView({ doctorId }: CalendarViewProps) {
           </motion.div>
         </div>
 
-        {/* PLANNING - DROITE (9 colonnes - plus large) */}
-        <div className="md:col-span-9 lg:col-span-9">
+        {/* PLANNING - DROITE (RÉDUIT: max-h-[550px]) */}
+        <div className="flex-1 w-full">
           <motion.div
             initial={{ opacity: 0, x: 20 }}
             animate={{ opacity: 1, x: 0 }}
             className="space-y-4"
           >
-            {/* Header du planning */}
-            <div className="bg-gradient-to-r from-purple-500 to-pink-600 rounded-2xl p-6 text-white shadow-xl">
+            {/* Header du planning - RÉDUIT */}
+            <div className="bg-gradient-to-r from-purple-500 to-pink-600 rounded-2xl p-4 text-white shadow-xl">
               <div className="flex items-center justify-between">
                 <div>
-                  <h3 className="text-2xl font-bold mb-1">
+                  <h3 className="text-lg font-bold mb-1">
                     {selectedDate.toLocaleDateString('fr-FR', { 
                       weekday: 'long', 
                       day: 'numeric', 
@@ -676,35 +680,35 @@ export function CalendarView({ doctorId }: CalendarViewProps) {
                       year: 'numeric' 
                     })}
                   </h3>
-                  <p className="text-purple-100 text-lg">
+                  <p className="text-purple-100 text-sm">
                     {todayAppointments.length} rendez-vous programmé{todayAppointments.length > 1 ? 's' : ''}
                   </p>
                 </div>
-                <div className="bg-white/20 backdrop-blur-sm rounded-xl p-4">
-                  <Calendar className="w-10 h-10" />
+                <div className="bg-white/20 backdrop-blur-sm rounded-xl p-3">
+                  <Calendar className="w-8 h-8" />
                 </div>
               </div>
             </div>
 
-            {/* Liste des rendez-vous */}
-            <div className="bg-white rounded-2xl shadow-xl p-6 min-h-[500px]">
+            {/* Liste des rendez-vous - RÉDUITE avec scroll */}
+            <div className="bg-white rounded-2xl shadow-xl p-4 max-h-[550px] overflow-y-auto custom-scrollbar">
               {todayAppointments.length === 0 ? (
-                <div className="flex flex-col items-center justify-center py-20 text-gray-400">
-                  <div className="bg-gradient-to-br from-gray-100 to-gray-200 rounded-full p-8 mb-6">
-                    <Calendar className="w-20 h-20" />
+                <div className="flex flex-col items-center justify-center py-16 text-gray-400">
+                  <div className="bg-gradient-to-br from-gray-100 to-gray-200 rounded-full p-6 mb-4">
+                    <Calendar className="w-16 h-16" />
                   </div>
-                  <p className="text-xl font-semibold mb-2">Aucun rendez-vous prévu</p>
+                  <p className="text-lg font-semibold mb-2">Aucun rendez-vous prévu</p>
                   <p className="text-sm">Sélectionnez un autre jour ou créez un rendez-vous</p>
                 </div>
               ) : (
-                <div className="space-y-4">
+                <div className="space-y-3">
                   {todayAppointments.map((apt) => (
                     <motion.div
                       key={apt.id}
                       initial={{ opacity: 0, y: 10 }}
                       animate={{ opacity: 1, y: 0 }}
-                      whileHover={{ scale: 1.02 }}
-                      className={`relative p-6 rounded-2xl border-2 transition-all shadow-md hover:shadow-xl ${
+                      whileHover={{ scale: 1.01 }}
+                      className={`relative p-4 rounded-2xl border-2 transition-all shadow-md hover:shadow-xl ${
                         apt.status === 'completed'
                           ? 'border-green-300 bg-gradient-to-r from-green-50 to-emerald-50'
                           : 'border-purple-300 bg-gradient-to-r from-purple-50 to-pink-50 hover:border-purple-500'
@@ -712,59 +716,59 @@ export function CalendarView({ doctorId }: CalendarViewProps) {
                     >
                       <div className="flex items-start justify-between gap-4">
                         <div className="flex-1">
-                          <div className="flex items-center gap-4 mb-4">
-                            <div className={`p-3 rounded-xl shadow-md ${
+                          <div className="flex items-center gap-3 mb-3">
+                            <div className={`p-2 rounded-xl shadow-md ${
                               apt.status === 'completed' 
                                 ? 'bg-gradient-to-br from-green-400 to-green-600' 
                                 : 'bg-gradient-to-br from-purple-500 to-pink-600'
                             }`}>
-                              <Clock className="w-6 h-6 text-white" />
+                              <Clock className="w-5 h-5 text-white" />
                             </div>
-                            <span className="text-xl font-bold text-gray-900">
+                            <span className="text-lg font-bold text-gray-900">
                               {apt.time}
                             </span>
                             {apt.notes && apt.notes.includes('🆕') && (
-                              <span className="px-4 py-1.5 bg-gradient-to-r from-blue-500 to-cyan-600 text-white text-sm rounded-full font-semibold shadow-md">
+                              <span className="px-3 py-1 bg-gradient-to-r from-blue-500 to-cyan-600 text-white text-xs rounded-full font-semibold shadow-md">
                                 🆕 Nouveau patient
                               </span>
                             )}
                             {apt.status === 'completed' && (
-                              <span className="px-4 py-1.5 bg-gradient-to-r from-green-500 to-emerald-600 text-white text-sm rounded-full font-semibold flex items-center gap-2 shadow-md">
-                                <Check className="w-4 h-4" />
+                              <span className="px-3 py-1 bg-gradient-to-r from-green-500 to-emerald-600 text-white text-xs rounded-full font-semibold flex items-center gap-2 shadow-md">
+                                <Check className="w-3 h-3" />
                                 Confirmé
                               </span>
                             )}
                           </div>
                           
-                          <div className="space-y-3 ml-16">
-                            <div className="flex items-center gap-3 text-gray-800">
-                              <User className="w-5 h-5 text-purple-500" />
-                              <span className="text-lg font-semibold">{apt.patient_name}</span>
+                          <div className="space-y-2 ml-12">
+                            <div className="flex items-center gap-2 text-gray-800">
+                              <User className="w-4 h-4 text-purple-500" />
+                              <span className="font-semibold">{apt.patient_name}</span>
                             </div>
                             {apt.patient_phone && (
-                              <div className="flex items-center gap-3 text-gray-600">
-                                <Phone className="w-5 h-5 text-purple-400" />
-                                <span className="text-base">{apt.patient_phone}</span>
+                              <div className="flex items-center gap-2 text-gray-600 text-sm">
+                                <Phone className="w-4 h-4 text-purple-400" />
+                                <span>{apt.patient_phone}</span>
                               </div>
                             )}
                           </div>
                         </div>
 
-                        {/* Actions */}
-                        <div className="flex gap-2">
+                        {/* Actions - COMPACTES */}
+                        <div className="flex gap-1.5">
                           {apt.status !== 'completed' && (
                             <>
                               <motion.button
-                                whileHover={{ scale: 1.15 }}
+                                whileHover={{ scale: 1.1 }}
                                 whileTap={{ scale: 0.9 }}
                                 onClick={() => handleEditClick(apt)}
-                                className="p-3 bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 rounded-xl transition-all shadow-md"
+                                className="p-2 bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 rounded-xl transition-all shadow-md"
                                 title="Modifier"
                               >
-                                <Edit className="w-5 h-5 text-white" />
+                                <Edit className="w-4 h-4 text-white" />
                               </motion.button>
                               <motion.button
-                                whileHover={{ scale: 1.15 }}
+                                whileHover={{ scale: 1.1 }}
                                 whileTap={{ scale: 0.9 }}
                                 onClick={async () => {
                                   try {
@@ -779,25 +783,25 @@ export function CalendarView({ doctorId }: CalendarViewProps) {
                                       pays: patientData?.pays || undefined
                                     });
                                   } catch (error) {
-                                    console.error('Erreur récupération pays:', error);
+                                    console.error('Erreur chargement patient:', error);
                                     setShowConfirmDialog(apt);
                                   }
                                 }}
-                                className="p-3 bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 rounded-xl transition-all shadow-md"
+                                className="p-2 bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 rounded-xl transition-all shadow-md"
                                 title="Confirmer"
                               >
-                                <Check className="w-5 h-5 text-white" />
+                                <Check className="w-4 h-4 text-white" />
                               </motion.button>
                             </>
                           )}
                           <motion.button
-                            whileHover={{ scale: 1.15 }}
+                            whileHover={{ scale: 1.1 }}
                             whileTap={{ scale: 0.9 }}
                             onClick={() => setShowDeleteDialog(apt)}
-                            className="p-3 bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 rounded-xl transition-all shadow-md"
+                            className="p-2 bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 rounded-xl transition-all shadow-md"
                             title="Supprimer"
                           >
-                            <Trash2 className="w-5 h-5 text-white" />
+                            <Trash2 className="w-4 h-4 text-white" />
                           </motion.button>
                         </div>
                       </div>
@@ -809,6 +813,8 @@ export function CalendarView({ doctorId }: CalendarViewProps) {
           </motion.div>
         </div>
       </div>
+
+
 
       {/* Modal Création Rendez-vous */}
       <AnimatePresence>

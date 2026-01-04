@@ -1,27 +1,14 @@
 import { useState, useEffect } from "react";
-import { motion, AnimatePresence } from "motion/react";
-import {
-  Calendar,
-  Users,
-  FileText,
-  TrendingUp,
-  User,
-  LogOut,
-  Stethoscope,
-  Activity,
-  Settings,
-  Database,
-  AlertCircle,
-} from "lucide-react";
+import { AnimatePresence } from "motion/react";
+import { LanguageProvider } from "./contexts/LanguageContext";
+import { authService } from "./lib/services";
+import { isSupabaseConfigured } from "./lib/supabase";
 import { LoginPage } from "./components/auth/LoginPage";
 import { RegisterPage } from "./components/auth/RegisterPage";
 import { AdminDashboard } from "./components/dashboards/AdminDashboard";
 import { MedecinDashboard } from "./components/dashboards/MedecinDashboard";
 import { SecretaireDashboard } from "./components/dashboards/SecretaireDashboard";
-import { SupabaseSetup } from "./components/SupabaseSetup";
-import { LanguageProvider } from "./contexts/LanguageContext";
-import { authService } from "./lib/services/supabaseService";
-import { isSupabaseConfigured } from "./lib/supabase";
+import { SupabaseSetup } from "./components/admin/SupabaseSetup";
 
 export type UserRole = "admin" | "doctor" | "secretary";
 
